@@ -1,0 +1,3 @@
+#include "resource.h"
+
+IDI_CRYPT_MAIN  ICON    "CryptoTool.ico"

@@ -12,6 +12,8 @@ target_compile_definitions(CryptoTool PRIVATE
     INI_ALLOW_MULTILINE=0
     INI_MAX_LINE=4096)
 
+target_sources(CryptoTool PRIVATE CryptoTool.rc)
+
 target_link_libraries(CryptoTool libcrypto)
 # target_link_libraries(CryptoTool libcrypto ComCtl32)
 

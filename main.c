@@ -4,11 +4,12 @@
 #include <openssl/evp.h>
 #include <openssl/err.h>
 
+#include "resource.h"
 #include "endec.h"
 #include "utils.h"
 #include "ini.h"
 
-#define VERSION_STRING  _T("V1.0")
+#define VERSION_STRING  _T("V1.1-DEV")
 
 #define CONFIG_FILENAME _T("CryptoTool.ini")
 #define MAX_INFILE_SIZE (128 * 1024)
@@ -959,12 +960,12 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCm
     wcex.cbClsExtra = 0;
     wcex.cbWndExtra = 0;
     wcex.hInstance = hInstance;
-    wcex.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-    wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_CRYPT_MAIN));
+    wcex.hCursor = LoadCursor(hInstance, IDC_ARROW);
     wcex.hbrBackground = (HBRUSH) COLOR_WINDOW;
     wcex.lpszMenuName = NULL;
     wcex.lpszClassName = WND_CLASSNAME;
-    wcex.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
+    wcex.hIconSm = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_CRYPT_MAIN));
 
     if (!RegisterClassEx(&wcex))
         return 0;
