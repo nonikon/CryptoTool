@@ -49,10 +49,10 @@ static HWND hDigestButton;
 static HWND hDigestProgressBar;
 
 static CONST TCHAR* algorithmItems[] = {
-    _T("MD5"), _T("SHA1"), _T("SHA2"), _T("SHA3"), _T("SM3"), _T("SHAKE"),
+    _T("BLAKE2B"), _T("BLAKE2S"), _T("MD4"), _T("MD5"), _T("RMD160"), _T("SHA1"), _T("SHA2"), _T("SHA3"), _T("SM3"), _T("WHIRLPOOL"),
 };
 enum {
-    ALG_MD5, ALG_SHA1, ALG_SHA2, ALG_SHA3, ALG_SM3, ALG_SHAKE,
+    ALG_BLAKE2B, ALG_BLAKE2S, ALG_MD4, ALG_MD5, ALG_RMD160, ALG_SHA1, ALG_SHA2, ALG_SHA3, ALG_SM3, ALG_WHIRLPOOL,
 };
 static CONST TCHAR* bitsItems[] = {
     _T("128"), _T("224"), _T("256"), _T("384"), _T("512"),
@@ -103,13 +103,12 @@ static void onAlgorithmChanged(HWND hWnd)
     INT alg = GETCBOPT(hAlgorithmComboBox);
 
     switch (alg) {
-    case ALG_MD5:
-    case ALG_SHA1:
-    case ALG_SM3:
-        EnableWindow(hBitsComboBox, FALSE);
+    case ALG_SHA2:
+    case ALG_SHA3:
+        EnableWindow(hBitsComboBox, TRUE);
         break;
     default:
-        EnableWindow(hBitsComboBox, TRUE);
+        EnableWindow(hBitsComboBox, FALSE);
         break;
     }
 }
@@ -275,8 +274,20 @@ static void onDigestClicked(HWND hWnd)
     }
 
     switch (alg) {
+    case ALG_BLAKE2B:
+        md = EVP_blake2b512();
+        break;
+    case ALG_BLAKE2S:
+        md = EVP_blake2s256();
+        break;
+    case ALG_MD4:
+        md = EVP_md4();
+        break;
     case ALG_MD5:
         md = EVP_md5();
+        break;
+    case ALG_RMD160:
+        md = EVP_ripemd160();
         break;
     case ALG_SHA1:
         md = EVP_sha1();
@@ -306,19 +317,12 @@ static void onDigestClicked(HWND hWnd)
     case ALG_SM3:
         md = EVP_sm3();
         break;
-    case ALG_SHAKE:
-        switch (bits) {
-        case BITS_128: md = EVP_shake128(); break;
-        case BITS_256: md = EVP_shake256(); break;
-        default:
-            WARN(_T("SHAKE BITS should be 128/256"));
-            goto cleanup;
-        }
-        if (key) {
-            WARN(_T("HMAC for SHAKE is not supported"));
-            goto cleanup;
-        }
+    case ALG_WHIRLPOOL:
+        md = EVP_whirlpool();
         break;
+    default:
+        WARN(_T("Invalid ALGORITHM"));
+        goto cleanup;
     }
 
     switch (infmt) {
@@ -587,6 +591,8 @@ VOID SetDigestConfigItem(CONST TCHAR* name, CONST TCHAR* value)
 
 BOOL DigestWindowCloseCheck()
 {
+    if (hDigestThread && CONFIRM(_T("digest thread running, exit?")) != IDOK)
+        return TRUE;
     return FALSE;
 }
 

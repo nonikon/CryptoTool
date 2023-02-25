@@ -50,10 +50,10 @@ static HWND hDecryptButton;
 static HWND hCryptProgressBar;
 
 static CONST TCHAR* algorithmItems[] = {
-    _T("AES"), _T("ARIA"), _T("BLOWFISH"), _T("CAMELLIA"), _T("CAST"), _T("CHACHA"), _T("IDEA"), _T("SEED"), _T("SM4"),
+    _T("AES"), _T("ARIA"), _T("BLOWFISH"), _T("CAMELLIA"), _T("CAST"), _T("CHACHA"), _T("IDEA"), _T("RC2"), _T("RC4"), _T("SEED"), _T("SM4"),
 };
 enum {
-    ALG_AES, ALG_ARIA, ALG_BLOWFISH, ALG_CAMELLIA, ALG_CAST, ALG_CHACHA, ALG_IDEA, ALG_SEED, ALG_SM4,
+    ALG_AES, ALG_ARIA, ALG_BLOWFISH, ALG_CAMELLIA, ALG_CAST, ALG_CHACHA, ALG_IDEA, ALG_RC2, ALG_RC4, ALG_SEED, ALG_SM4,
 };
 static CONST TCHAR* modeItems[] = {
     _T("ECB"), _T("CBC"), _T("CFB"), _T("OFB"), _T("CTR"),
@@ -102,8 +102,25 @@ static void onDropFiles(HWND hWnd, HDROP hDrop)
     free(buf);
 }
 
-static BOOL isPaddingNeeded(INT mode)
+static BOOL isModeNeeded(INT alg)
 {
+    switch (alg) {
+    case ALG_CHACHA:
+    case ALG_RC4:
+        return FALSE;
+    default:
+        return TRUE;
+    }
+}
+static BOOL isPaddingNeeded(INT alg, INT mode)
+{
+    switch (alg) {
+    case ALG_CHACHA:
+    case ALG_RC4:
+        return FALSE;
+    default:
+        break;
+    }
     switch (mode) {
     case MODE_ECB:
     case MODE_CBC:
@@ -112,8 +129,16 @@ static BOOL isPaddingNeeded(INT mode)
         return FALSE;
     }
 }
-static BOOL isIVNeeded(INT mode)
+static BOOL isIVNeeded(INT alg, INT mode)
 {
+    switch (alg) {
+    case ALG_CHACHA:
+        return TRUE;
+    case ALG_RC4:
+        return FALSE;
+    default:
+        break;
+    }
     switch (mode) {
     case MODE_ECB:
         return FALSE;
@@ -122,22 +147,14 @@ static BOOL isIVNeeded(INT mode)
     }
 }
 
-static void onModeChanged(HWND hWnd)
-{
-    INT mode = GETCBOPT(hModeComboBox);
-
-    EnableWindow(hPaddingComboBox, isPaddingNeeded(mode));
-    EnableWindow(hIVEditBox, isIVNeeded(mode));
-}
-
-static void onAlgorithmChanged(HWND hWnd)
+static void onAlgorithmOrModeChanged(HWND hWnd)
 {
     INT alg = GETCBOPT(hAlgorithmComboBox);
+    INT mode = GETCBOPT(hModeComboBox);
 
-    if (alg == ALG_CHACHA) {
-        SETCBOPT(hModeComboBox, MODE_CTR);
-        onModeChanged(hWnd);
-    }
+    EnableWindow(hModeComboBox, isModeNeeded(alg));
+    EnableWindow(hPaddingComboBox, isPaddingNeeded(alg, mode));
+    EnableWindow(hIVEditBox, isIVNeeded(alg, mode));
 }
 
 static DWORD doCryptFile(VOID* arg)
@@ -354,14 +371,23 @@ static void doCrypt(HWND hWnd, BOOL isDec)
         __SELECT_CIPHER_BY_MODE_NOCTR(cast5, CAST5)
         break;
     case ALG_CHACHA:
-        if (mode != MODE_CTR) {
-            WARN(_T("CHACHA20 only supports CTR mode"));
-            goto cleanup;
-        }
         ciph = EVP_chacha20();
         break;
     case ALG_IDEA:
         __SELECT_CIPHER_BY_MODE_NOCTR(idea, IDEA)
+        break;
+    case ALG_RC2:
+        __SELECT_CIPHER_BY_MODE_NOCTR(rc2, RC2);
+        break;
+    case ALG_RC4:
+        switch (keyl) {
+        case 128 / 8: ciph = EVP_rc4(); break;
+        case 40  / 8: ciph = EVP_rc4_40(); break;
+        default:
+            WARN(_T("RC4 KEY length only supports 40/128 bits"));
+            goto cleanup;
+        }
+        ivl = 0; /* ignore input IV */
         break;
     case ALG_SEED:
         __SELECT_CIPHER_BY_MODE_NOCTR(seed, SEED)
@@ -443,10 +469,10 @@ static void doCrypt(HWND hWnd, BOOL isDec)
         cryptThreadParams.outPath = outs;
         if (isDec) {
             /* input file size needs to be a multiple of block size when MODE is ECB/CBC. */
-            cryptThreadParams.needChkSize = isPaddingNeeded(mode);
+            cryptThreadParams.needChkSize = isPaddingNeeded(alg, mode);
         } else {
             /* input file size needs to be a multiple of block size when MODE is ECB/CBC and padding is OFF. */
-            cryptThreadParams.needChkSize = isPaddingNeeded(mode) && pad == PAD_NONE;
+            cryptThreadParams.needChkSize = isPaddingNeeded(alg, mode) && pad == PAD_NONE;
         }
 
         hCryptThread = CreateThread(NULL, 0, doCryptFile, &cryptThreadParams, 0, NULL);
@@ -465,6 +491,13 @@ static void doCrypt(HWND hWnd, BOOL isDec)
     }
     FormatTextTo(hInputStaticText, _T("INPUT %d"), inl);
 
+    if (isPaddingNeeded(alg, mode) && pad == PAD_NONE
+            && inl % EVP_CIPHER_block_size(ciph) != 0) {
+        WARN(_T("INPUT length needs to be a multiple of %d when PADDING is NONE"),
+            EVP_CIPHER_block_size(ciph));
+        goto cleanup;
+    }
+
     out = malloc(inl + EVP_CIPHER_block_size(ciph));
 
     if (!EVP_CipherUpdate(ctx, out, &outl, in, inl)) {
@@ -472,7 +505,7 @@ static void doCrypt(HWND hWnd, BOOL isDec)
         goto cleanup;
     }
     if (!EVP_CipherFinal(ctx, (UCHAR*) out + outl, &tmpl)) {
-        WARN(_T("EVP_CipherFinal failed (INPUT error), code 0x%08X"), ERR_get_error());
+        WARN(_T("EVP_CipherFinal failed, code 0x%08X"), ERR_get_error());
         goto cleanup;
     }
     outl += tmpl;
@@ -655,7 +688,7 @@ static void onWindowCreate(HWND hWnd)
     SendMessage(hInputEditBox, EM_SETLIMITTEXT, (WPARAM) (MAX_INFILE_SIZE * 5), 0);
     SendMessage(hOutputEditBox, EM_SETLIMITTEXT, (WPARAM) (MAX_INFILE_SIZE * 5), 0);
 
-    onModeChanged(hWnd);
+    onAlgorithmOrModeChanged(hWnd);
     resizeWindows(hWnd);
 }
 
@@ -674,12 +707,9 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
     case WM_COMMAND:
         switch (LOWORD(wParam)) {
         case WM_USER_ALGORITHM:
-            if (HIWORD(wParam) == CBN_SELCHANGE)
-                onAlgorithmChanged(hWnd);
-            break;
         case WM_USER_MODE:
             if (HIWORD(wParam) == CBN_SELCHANGE)
-                onModeChanged(hWnd);
+                onAlgorithmOrModeChanged(hWnd);
             break;
         case WM_USER_ENCRYPT:
             onEncryptClicked(hWnd);
@@ -723,7 +753,7 @@ VOID SetSymmConfigItem(CONST TCHAR* name, CONST TCHAR* value)
     if (!lstrcmp(name, _T("ALGRITHM"))) {
         __SELECT_OPTION(algorithmItems, hAlgorithmComboBox);
     } else if (!lstrcmp(name, _T("MODE"))) {
-        __SELECT_OPTION_EX(modeItems, hModeComboBox, onModeChanged(NULL));
+        __SELECT_OPTION_EX(modeItems, hModeComboBox, onAlgorithmOrModeChanged(NULL));
     } else if (!lstrcmp(name, _T("PADDING"))) {
         __SELECT_OPTION(paddingItems, hPaddingComboBox);
     } else if (!lstrcmp(name, _T("IN-FORMAT"))) {
@@ -747,8 +777,8 @@ VOID SetSymmConfigItem(CONST TCHAR* name, CONST TCHAR* value)
 BOOL SymmWindowCloseCheck()
 {
     if (hCryptThread && CONFIRM(_T("crypt thread running, exit?")) != IDOK)
-        return 1;
-    return 0;
+        return TRUE;
+    return FALSE;
 }
 
 HWND CreateSymmWindow(HWND hWnd)
