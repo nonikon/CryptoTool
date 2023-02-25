@@ -1,6 +1,52 @@
-#include "utils.h"
+#include "common.h"
 
-TCHAR* trimFilePath(TCHAR* path, UINT maxl)
+VOID SetChildWindowsFont(HWND hWnd, HFONT hFont)
+{
+    HWND hChild = NULL;
+
+    while (!!(hChild = FindWindowEx(hWnd, hChild, NULL, NULL))) {
+        SendMessage(hChild, WM_SETFONT, (WPARAM) hFont, FALSE);
+    }
+}
+
+TCHAR* GetTextOnce(HWND hWnd)
+{
+    TCHAR* buf;
+    int len;
+    
+    len = GetWindowTextLength(hWnd); /* >=0 */
+    buf = malloc(sizeof(TCHAR) * (len + 1));
+
+    memset(buf, 0, sizeof(TCHAR) * (len + 1));
+    GetWindowText(hWnd, buf, len + 1);
+    return buf;
+}
+
+INT FormatMessageBox(HWND hWnd, UINT type, CONST TCHAR* title, CONST TCHAR* fmt, ...)
+{
+    TCHAR buf[512];
+    va_list ap;
+
+    va_start(ap, fmt);
+    wvsprintf(buf, fmt, ap);
+    va_end(ap);
+
+    return MessageBox(hWnd, buf, title, type);
+}
+
+VOID FormatTextTo(HWND hWnd, CONST TCHAR* fmt, ...)
+{
+    TCHAR buf[512];
+    va_list ap;
+
+    va_start(ap, fmt);
+    wvsprintf(buf, fmt, ap);
+    va_end(ap);
+
+    SetWindowText(hWnd, buf);
+}
+
+TCHAR* TrimFilePath(TCHAR* path, UINT maxl)
 {
     UINT l = lstrlen(path);
 

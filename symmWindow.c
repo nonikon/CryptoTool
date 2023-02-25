@@ -1,0 +1,773 @@
+#include <openssl/evp.h>
+#include <openssl/err.h>
+
+#include "mainWindow.h"
+#include "encode.h"
+
+#define WND_CLASSNAME       _T("SymmWindowClass")
+
+#define WM_USER_ENCRYPT     (WM_USER + 1)
+#define WM_USER_DECRYPT     (WM_USER + 2)
+#define WM_USER_ALGORITHM   (WM_USER + 3)
+#define WM_USER_MODE        (WM_USER + 4)
+#define WM_USER_THREAD      (WM_USER + 5)
+
+typedef struct stCryptThreadParams {
+    /* IN */
+    HWND hWnd;
+    EVP_CIPHER_CTX* ciphCtx;
+    TCHAR* inPath;
+    TCHAR* outPath;
+    BOOL needChkSize;
+    /* OUT */
+    BOOL isSucc;
+    TCHAR errorMsg[256];
+} CryptThreadParams;
+
+static HANDLE hCryptThread;
+static CryptThreadParams cryptThreadParams;
+
+static HWND hAlgorithmStaticText;
+static HWND hAlgorithmComboBox;
+static HWND hModeStaticText;
+static HWND hModeComboBox;
+static HWND hPaddingStaticText;
+static HWND hPaddingComboBox;
+static HWND hInformatStaticText;
+static HWND hInformatComboBox;
+static HWND hOutformatStaticText;
+static HWND hOutformatComboBox;
+static HWND hKeyStaticText;
+static HWND hKeyEditBox;
+static HWND hIVStaticText;
+static HWND hIVEditBox;
+static HWND hInputStaticText;
+static HWND hInputEditBox;
+static HWND hOutputStaticText;
+static HWND hOutputEditBox;
+static HWND hEncryptButton;
+static HWND hDecryptButton;
+static HWND hCryptProgressBar;
+
+static CONST TCHAR* algorithmItems[] = {
+    _T("AES"), _T("ARIA"), _T("BLOWFISH"), _T("CAMELLIA"), _T("CAST"), _T("CHACHA"), _T("IDEA"), _T("SEED"), _T("SM4"),
+};
+enum {
+    ALG_AES, ALG_ARIA, ALG_BLOWFISH, ALG_CAMELLIA, ALG_CAST, ALG_CHACHA, ALG_IDEA, ALG_SEED, ALG_SM4,
+};
+static CONST TCHAR* modeItems[] = {
+    _T("ECB"), _T("CBC"), _T("CFB"), _T("OFB"), _T("CTR"),
+};
+enum {
+    MODE_ECB, MODE_CBC, MODE_CFB, MODE_OFB, MODE_CTR,
+};
+static CONST TCHAR* paddingItems[] = {
+    _T("NONE"), _T("PKCS")
+};
+enum {
+    PAD_NONE, PAD_PKCS,
+};
+static CONST TCHAR* informatItems[] = {
+    _T("HEX"), _T("BASE64"), _T("C-ARRAY"), _T("C-STRING"), _T("FILE"),
+};
+enum {
+    IFMT_HEX, IFMT_BASE64, IFMT_C_ARRAY, IFMT_C_STRING, IFMT_FILE,
+};
+static CONST TCHAR* outformatItems[] = {
+    _T("HEX"), _T("BASE64"), _T("C-ARRAY"), _T("C-STRING"), _T("FILE"),
+};
+enum {
+    OFMT_HEX, OFMT_BASE64, OFMT_C_ARRAY, OFMT_C_STRING, OFMT_FILE,
+};
+
+
+static void onDropFiles(HWND hWnd, HDROP hDrop)
+{
+    TCHAR* buf;
+    UINT len;
+
+    len = DragQueryFile(hDrop, 0, NULL, 0); /* >=0 */
+    buf = malloc(sizeof(TCHAR) * (len + 4 + 1)); /* .out */
+
+    memset(buf, 0, sizeof(TCHAR) * (len + 4 + 1));
+    DragQueryFile(hDrop, 0, buf, len + 1);
+
+    if (IsFile(buf)) {
+        SetWindowText(hInputEditBox, buf);
+        memcpy(buf + len, _T(".out"), sizeof(TCHAR) * 4);
+        SetWindowText(hOutputEditBox, buf);
+    }
+
+    DragFinish(hDrop);
+    free(buf);
+}
+
+static BOOL isPaddingNeeded(INT mode)
+{
+    switch (mode) {
+    case MODE_ECB:
+    case MODE_CBC:
+        return TRUE;
+    default:
+        return FALSE;
+    }
+}
+static BOOL isIVNeeded(INT mode)
+{
+    switch (mode) {
+    case MODE_ECB:
+        return FALSE;
+    default:
+        return TRUE;
+    }
+}
+
+static void onModeChanged(HWND hWnd)
+{
+    INT mode = GETCBOPT(hModeComboBox);
+
+    EnableWindow(hPaddingComboBox, isPaddingNeeded(mode));
+    EnableWindow(hIVEditBox, isIVNeeded(mode));
+}
+
+static void onAlgorithmChanged(HWND hWnd)
+{
+    INT alg = GETCBOPT(hAlgorithmComboBox);
+
+    if (alg == ALG_CHACHA) {
+        SETCBOPT(hModeComboBox, MODE_CTR);
+        onModeChanged(hWnd);
+    }
+}
+
+static DWORD doCryptFile(VOID* arg)
+{
+    CryptThreadParams* params = arg;
+    HANDLE hIn = INVALID_HANDLE_VALUE;
+    HANDLE hOut = INVALID_HANDLE_VALUE;
+    UCHAR* rBuf = NULL;
+    UCHAR* wBuf = NULL;
+    DWORD progressPercent = 0;
+    DWORD tempPercent;
+    DWORD nReadWrite;
+    DWORD beginTickCnt;
+    DWORD endTickCnt;
+    LARGE_INTEGER current;
+    LARGE_INTEGER total;
+    int outl;
+
+    params->isSucc = FALSE;
+    beginTickCnt = GetTickCount();
+
+    hIn = CreateFile(params->inPath, GENERIC_READ, FILE_SHARE_READ, NULL,
+                    OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hIn == INVALID_HANDLE_VALUE) {
+        wsprintf(params->errorMsg, _T("open INPUT file [%s] failed"), TRIMPATH(params->inPath));
+        goto done;
+    }
+    if (!GetFileSizeEx(hIn, &total)) {
+        wsprintf(params->errorMsg, _T("get INPUT file size [%s] failed"), TRIMPATH(params->inPath));
+        goto done;
+    }
+    if (params->needChkSize && total.QuadPart % EVP_CIPHER_CTX_block_size(params->ciphCtx) != 0) {
+        wsprintf(params->errorMsg, _T("INPUT file size is not a multiple of %d"),
+            EVP_CIPHER_CTX_block_size(params->ciphCtx));
+        goto done;
+    }
+
+    hOut = CreateFile(params->outPath, GENERIC_WRITE, 0, NULL,
+                    CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hOut == INVALID_HANDLE_VALUE) {
+        wsprintf(params->errorMsg, _T("open OUTPUT file [%s] failed"), TRIMPATH(params->outPath));
+        goto done;
+    }
+
+    current.QuadPart = 0;
+    rBuf = malloc(FILE_RBUF_SIZE);
+    wBuf = malloc(FILE_RBUF_SIZE + EVP_MAX_BLOCK_LENGTH); /* big enough to store encrypt/decrypt result */
+
+    while (1) {
+        ReadFile(hIn, rBuf, FILE_RBUF_SIZE, &nReadWrite, NULL);
+
+        if (!nReadWrite) {
+            if (!EVP_CipherFinal(params->ciphCtx, wBuf, &outl)) {
+                wsprintf(params->errorMsg, _T("EVP_CipherFinal failed (INPUT error), code 0x%08X"), ERR_get_error());
+                goto done;
+            }
+            if (outl && !WriteFile(hOut, wBuf, outl, &nReadWrite, NULL)) {
+                wsprintf(params->errorMsg, _T("write to [%s] failed"), TRIMPATH(params->outPath));
+                goto done;
+            }
+            break;
+        }
+        current.QuadPart += nReadWrite;
+
+        if (!EVP_CipherUpdate(params->ciphCtx, wBuf, &outl, rBuf, nReadWrite)) {
+            wsprintf(params->errorMsg, _T("EVP_CipherUpdate failed, code 0x%08X"), ERR_get_error());
+            goto done;
+        }
+        if (!WriteFile(hOut, wBuf, outl, &nReadWrite, NULL)) {
+            wsprintf(params->errorMsg, _T("write to [%s] failed"), TRIMPATH(params->outPath));
+            goto done;
+        }
+
+        tempPercent = (current.QuadPart * 100 / total.QuadPart) & 0xFFFFFFFF;
+        if (progressPercent != tempPercent) {
+            PostMessage(hCryptProgressBar, PBM_SETPOS, (WPARAM) tempPercent, 0);
+            progressPercent = tempPercent;
+        }
+    }
+
+    params->isSucc = TRUE;
+    endTickCnt = GetTickCount();
+
+    wsprintf(params->errorMsg, _T("crypt done, time %u.%us"),
+        (endTickCnt - beginTickCnt) / 1000, (endTickCnt - beginTickCnt) % 1000);
+done:
+    CloseHandle(hIn);
+    CloseHandle(hOut);
+    free(rBuf);
+    free(wBuf);
+    PostMessage(params->hWnd, WM_COMMAND, (WPARAM) WM_USER_THREAD, (LPARAM) arg);
+    return 0;
+}
+static void onCryptThreadDone(HWND hWnd, CryptThreadParams* params)
+{
+    WaitForSingleObject(hCryptThread, INFINITE);
+    CloseHandle(hCryptThread);
+
+    ShowWindow(hCryptProgressBar, SW_HIDE);
+    SendMessage(hCryptProgressBar, PBM_SETPOS, 0, 0);
+
+    if (params->isSucc)
+        INFO(params->errorMsg);
+    else
+        WARN(params->errorMsg);
+
+    free(params->inPath);
+    free(params->outPath);
+    EVP_CIPHER_CTX_free(params->ciphCtx);
+    hCryptThread = NULL;
+}
+
+static void doCrypt(HWND hWnd, BOOL isDec)
+{
+    CONST EVP_CIPHER* ciph;
+    EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+    INT alg = GETCBOPT(hAlgorithmComboBox);
+    INT mode = GETCBOPT(hModeComboBox);
+    INT pad = GETCBOPT(hPaddingComboBox);
+    INT infmt = GETCBOPT(hInformatComboBox);
+    INT outfmt = GETCBOPT(hOutformatComboBox);
+    VOID* key = GetTextOnce(hKeyEditBox);
+    VOID* iv = GetTextOnce(hIVEditBox);
+    VOID* in = GetTextOnce(hInputEditBox);
+    VOID* out = NULL;
+    TCHAR* outs = NULL;
+    INT keyl;
+    INT ivl;
+    INT inl;
+    INT outl;
+    INT tmpl;
+
+#define __SELECT_CIPHER_BY_MODE(name) \
+        switch (mode) { \
+        case MODE_ECB: ciph = EVP_##name##_ecb(); ivl = 0; /* ignore input IV */ break; \
+        case MODE_CBC: ciph = EVP_##name##_cbc(); break; \
+        case MODE_CFB: ciph = EVP_##name##_cfb(); break; \
+        case MODE_OFB: ciph = EVP_##name##_ofb(); break; \
+        case MODE_CTR: ciph = EVP_##name##_ctr(); break; \
+        default: \
+            WARN(_T("Invalid MODE %d"), mode); \
+            goto cleanup; \
+        }
+
+#define __SELECT_CIPHER_BY_MODE_NOCTR(name, notify) \
+        switch (mode) { \
+        case MODE_ECB: ciph = EVP_##name##_ecb(); ivl = 0; /* ignore input IV */ break; \
+        case MODE_CBC: ciph = EVP_##name##_cbc(); break; \
+        case MODE_CFB: ciph = EVP_##name##_cfb(); break; \
+        case MODE_OFB: ciph = EVP_##name##_ofb(); break; \
+        case MODE_CTR: \
+            WARN(_T(#notify"-CTR is not supported")); \
+            goto cleanup; \
+        default: \
+            WARN(_T("Invalid MODE %d"), mode); \
+            goto cleanup; \
+        }
+
+#define __SELECT_CIPHER_BY_KEYL(name) \
+        switch (keyl) { \
+        case 128 / 8: \
+            __SELECT_CIPHER_BY_MODE(name##_128) \
+            break; \
+        case 192 / 8: \
+            __SELECT_CIPHER_BY_MODE(name##_192) \
+            break; \
+        case 256 / 8: \
+            __SELECT_CIPHER_BY_MODE(name##_256) \
+            break; \
+        default: \
+            WARN(_T("KEY length should be 128/192/256 bits")); \
+            goto cleanup; \
+        }
+
+#define __CONVERT_INPUT(func, notify) \
+        if (TrimSpace(in)) \
+            SetWindowText(hInputEditBox, in); \
+        inl = func(in); \
+        if (inl <= 0) { \
+            WARN(notify); \
+            goto cleanup; \
+        }
+
+    if (TrimSpace(key))
+        SetWindowText(hKeyEditBox, key);
+    keyl = HexCharsToBinary(key);
+    if (keyl < 0) {
+        WARN(_T("KEY is not a HEX string"));
+        goto cleanup;
+    }
+
+    if (TrimSpace(iv))
+        SetWindowText(hIVEditBox, iv);
+    ivl = HexCharsToBinary(iv);
+    if (ivl < 0) {
+        WARN(_T("IV is not a HEX string"));
+        goto cleanup;
+    }
+
+    switch (alg) {
+    case ALG_AES:
+        __SELECT_CIPHER_BY_KEYL(aes)
+        break;
+    case ALG_ARIA:
+        __SELECT_CIPHER_BY_KEYL(aria)
+        break;
+    case ALG_BLOWFISH:
+        __SELECT_CIPHER_BY_MODE_NOCTR(bf, BLOWFISH)
+        break;
+    case ALG_CAMELLIA:
+        __SELECT_CIPHER_BY_KEYL(camellia)
+        break;
+    case ALG_CAST:
+        __SELECT_CIPHER_BY_MODE_NOCTR(cast5, CAST5)
+        break;
+    case ALG_CHACHA:
+        if (mode != MODE_CTR) {
+            WARN(_T("CHACHA20 only supports CTR mode"));
+            goto cleanup;
+        }
+        ciph = EVP_chacha20();
+        break;
+    case ALG_IDEA:
+        __SELECT_CIPHER_BY_MODE_NOCTR(idea, IDEA)
+        break;
+    case ALG_SEED:
+        __SELECT_CIPHER_BY_MODE_NOCTR(seed, SEED)
+        break;
+    case ALG_SM4:
+        __SELECT_CIPHER_BY_MODE(sm4)
+        break;
+    default:
+        WARN(_T("Invalid ALGORITHM"));
+        goto cleanup;
+    }
+
+    if (keyl != EVP_CIPHER_key_length(ciph)) {
+        WARN(_T("KEY length should be %d bits"), EVP_CIPHER_key_length(ciph) * 8);
+        goto cleanup;
+    }
+    if (ivl != EVP_CIPHER_iv_length(ciph)) {
+        WARN(_T("IV length should be %d bits"), EVP_CIPHER_iv_length(ciph) * 8);
+        goto cleanup;
+    }
+
+    if (!EVP_CipherInit(ctx, ciph, key, ivl > 0 ? iv : NULL, !isDec)) {
+        WARN(_T("EVP_CipherInit failed"));
+        goto cleanup;
+    }
+
+    switch (pad) {
+    case PAD_NONE:
+        EVP_CIPHER_CTX_set_padding(ctx, 0);
+        break;
+    case PAD_PKCS:
+        // EVP_CIPHER_CTX_set_padding(ctx, 1); /* padding is ON by default. */
+        break;
+    default:
+        WARN(_T("Invalid PADDING"));
+        goto cleanup;
+    }
+
+    switch (infmt) {
+    case IFMT_HEX:
+        __CONVERT_INPUT(HexCharsToBinary, _T("INPUT is not a HEX string"));
+        break;
+    case IFMT_BASE64:
+        __CONVERT_INPUT(Base64CharsToBinary, _T("INPUT is not a BASE64 string"));
+        break;
+    case IFMT_C_ARRAY:
+        __CONVERT_INPUT(CArrayCharsToBinary, _T("INPUT is not a C-ARRAY string"));
+        break;
+    case IFMT_C_STRING:
+        __CONVERT_INPUT(CStringCharsToBinary, _T("INPUT is not a C-STRING string"));
+        break;
+    case IFMT_FILE:
+        if (outfmt != OFMT_FILE) {
+            TCHAR* _in;
+            inl = MAX_INFILE_SIZE;
+            _in = ReadFileOnce(in, (UINT*) &inl);
+            if (!_in) {
+                WARN(_T("file [%s] does not exist or > %uKB when OUT-FORMAT is not a FILE"),
+                    TRIMPATH(in), MAX_INFILE_SIZE / 1024);
+                goto cleanup;
+            }
+            free(in);
+            in = _in;
+            break;
+        }
+        /* outfmt == OFMT_FILE, start crypt file int the thread. */
+        if (hCryptThread) {
+            WARN(_T("crypt thread already running"));
+            goto cleanup;
+        }
+        outs = GetTextOnce(hOutputEditBox);
+
+        if (IsFile(outs) && CONFIRM(_T("OUTPUT file will be overwrite, continue?")) != IDOK)
+            goto cleanup;
+
+        cryptThreadParams.hWnd = hWnd;
+        cryptThreadParams.ciphCtx = ctx;
+        cryptThreadParams.inPath = in;
+        cryptThreadParams.outPath = outs;
+        if (isDec) {
+            /* input file size needs to be a multiple of block size when MODE is ECB/CBC. */
+            cryptThreadParams.needChkSize = isPaddingNeeded(mode);
+        } else {
+            /* input file size needs to be a multiple of block size when MODE is ECB/CBC and padding is OFF. */
+            cryptThreadParams.needChkSize = isPaddingNeeded(mode) && pad == PAD_NONE;
+        }
+
+        hCryptThread = CreateThread(NULL, 0, doCryptFile, &cryptThreadParams, 0, NULL);
+        if (!hCryptThread) {
+            WARN(_T("create crypt thread failed"));
+            goto cleanup;
+        }
+        free(key);
+        free(iv);
+        ShowWindow(hCryptProgressBar, SW_SHOW);
+        /* something else is freed when crypt thread done */
+        return;
+    default:
+        WARN(_T("Invalid IN-FORMAT"));
+        goto cleanup;
+    }
+    FormatTextTo(hInputStaticText, _T("INPUT %d"), inl);
+
+    out = malloc(inl + EVP_CIPHER_block_size(ciph));
+
+    if (!EVP_CipherUpdate(ctx, out, &outl, in, inl)) {
+        WARN(_T("EVP_CipherUpdate failed, code 0x%08X"), ERR_get_error());
+        goto cleanup;
+    }
+    if (!EVP_CipherFinal(ctx, (UCHAR*) out + outl, &tmpl)) {
+        WARN(_T("EVP_CipherFinal failed (INPUT error), code 0x%08X"), ERR_get_error());
+        goto cleanup;
+    }
+    outl += tmpl;
+    FormatTextTo(hOutputStaticText, _T("OUTPUT %d"), outl);
+
+    switch (outfmt) {
+    case OFMT_HEX:
+        outs = BinaryToHexChars(out, outl);
+        SetWindowText(hOutputEditBox, outs);
+        break;
+    case OFMT_BASE64:
+        outs = BinaryToBase64Chars(out, outl);
+        SetWindowText(hOutputEditBox, outs);
+        break;
+    case OFMT_C_ARRAY:
+        outs = BinaryToCArrayChars(out, outl);
+        SetWindowText(hOutputEditBox, outs);
+        break;
+    case OFMT_C_STRING:
+        outs = BinaryToCStringChars(out, outl);
+        SetWindowText(hOutputEditBox, outs);
+        break;
+    case OFMT_FILE:
+        outs = GetTextOnce(hOutputEditBox);
+        if (IsFile(outs) && CONFIRM(_T("OUTPUT file will be overwrite, continue?")) != IDOK)
+            goto cleanup;
+        if (WriteFileOnce(outs, out, outl))
+            INFO(_T("Write output to [%s] done"), TRIMPATH(outs));
+        else
+            WARN(_T("Write output to [%s] failed"), TRIMPATH(outs));
+        break;
+    default:
+        WARN(_T("Invalid OUT-FORMAT"));
+        goto cleanup;
+    }
+
+cleanup:
+    free(key);
+    free(iv);
+    free(in);
+    free(out);
+    free(outs);
+    EVP_CIPHER_CTX_free(ctx);
+#undef __CONVERT_INPUT
+#undef __SELECT_CIPHER_BY_KEYL
+#undef __SELECT_CIPHER_BY_MODE_NOCTR
+#undef __SELECT_CIPHER_BY_MODE
+}
+
+static void onEncryptClicked(HWND hWnd)
+{
+    doCrypt(hWnd, FALSE);
+}
+
+static void onDecryptClicked(HWND hWnd)
+{
+    doCrypt(hWnd, TRUE);
+}
+
+static void resizeWindows(HWND hWnd)
+{
+    INT w = WND_ALIGN;
+    INT h = WND_ALIGN;
+
+    MoveWindow(hAlgorithmStaticText, w, h, WND_COMBOXW, WND_LINEH, FALSE);
+    MoveWindow(hAlgorithmComboBox, w, h + WND_LINEH, WND_COMBOXW, WND_LINEH, FALSE);
+    w += WND_COMBOXW + WND_ALIGN;
+    MoveWindow(hModeStaticText, w, h, WND_COMBOXW, WND_LINEH, FALSE);
+    MoveWindow(hModeComboBox, w, h + WND_LINEH, WND_COMBOXW, WND_LINEH, FALSE);
+    w += WND_COMBOXW + WND_ALIGN;
+    MoveWindow(hPaddingStaticText, w, h, WND_COMBOXW, WND_LINEH, FALSE);
+    MoveWindow(hPaddingComboBox, w, h + WND_LINEH, WND_COMBOXW, WND_LINEH, FALSE);
+    w += WND_COMBOXW + WND_ALIGN;
+    MoveWindow(hInformatStaticText, w, h, WND_COMBOXW, WND_LINEH, FALSE);
+    MoveWindow(hInformatComboBox, w, h + WND_LINEH, WND_COMBOXW, WND_LINEH, FALSE);
+    w += WND_COMBOXW + WND_ALIGN;
+    MoveWindow(hOutformatStaticText, w, h, WND_COMBOXW, WND_LINEH, FALSE);
+    MoveWindow(hOutformatComboBox, w, h + WND_LINEH, WND_COMBOXW, WND_LINEH, FALSE);
+    w += WND_COMBOXW + WND_ALIGN;
+
+    h += WND_LINEH + WND_LINEH + WND_ALIGN;
+
+    MoveWindow(hKeyStaticText, WND_ALIGN, h, w - WND_ALIGN * 2, WND_LINEH, FALSE);
+    h += WND_LINEH;
+    MoveWindow(hKeyEditBox, WND_ALIGN, h, w - WND_ALIGN * 2, WND_LINEH, FALSE);
+    h += WND_LINEH + WND_ALIGN;
+
+    MoveWindow(hIVStaticText, WND_ALIGN, h, w - WND_ALIGN * 2, WND_LINEH, FALSE);
+    h += WND_LINEH;
+    MoveWindow(hIVEditBox, WND_ALIGN, h, w - WND_ALIGN * 2, WND_LINEH, FALSE);
+    h += WND_LINEH + WND_ALIGN;
+
+    MoveWindow(hInputStaticText, WND_ALIGN, h, w - WND_ALIGN * 2, WND_LINEH, FALSE);
+    h += WND_LINEH;
+    MoveWindow(hInputEditBox, WND_ALIGN, h, w - WND_ALIGN * 2, WND_LINEH * 6, FALSE);
+    h += WND_LINEH * 6 + WND_ALIGN;
+
+    MoveWindow(hOutputStaticText, WND_ALIGN, h, w / 2 - WND_ALIGN, WND_LINEH, FALSE);
+    h += WND_LINEH;
+    MoveWindow(hOutputEditBox, WND_ALIGN, h, w - WND_ALIGN * 2, WND_LINEH * 6, FALSE);
+    h += WND_LINEH * 6 + WND_ALIGN;
+
+    MoveWindow(hCryptProgressBar, WND_ALIGN, h, w / 2 - WND_BUTTONW - WND_ALIGN / 2 - WND_ALIGN * 2, WND_LINEH, FALSE);
+    MoveWindow(hEncryptButton, w / 2 - WND_BUTTONW - WND_ALIGN / 2, h, WND_BUTTONW, WND_LINEH, FALSE);
+    MoveWindow(hDecryptButton, w / 2 + WND_ALIGN / 2, h, WND_BUTTONW, WND_LINEH, FALSE);
+    h += WND_LINEH + WND_ALIGN;
+
+    MoveWindow(hWnd, 0, 0, w, h, FALSE);
+}
+
+static void onWindowCreate(HWND hWnd)
+{
+    INT i;
+
+    hAlgorithmStaticText = CreateWindow(_T("STATIC"), _T("ALGORITHM"), WS_CHILD | WS_VISIBLE | SS_LEFT,
+                                0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
+    hAlgorithmComboBox = CreateWindow(_T("COMBOBOX"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | CBS_DROPDOWNLIST,
+                                0, 0, 0, 0, hWnd, (HMENU) WM_USER_ALGORITHM, hMainInstance, NULL);
+    hModeStaticText = CreateWindow(_T("STATIC"), _T("MODE"), WS_CHILD | WS_VISIBLE | SS_LEFT,
+                                0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
+    hModeComboBox = CreateWindow(_T("COMBOBOX"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | CBS_DROPDOWNLIST,
+                                0, 0, 0, 0, hWnd, (HMENU) WM_USER_MODE, hMainInstance, NULL);
+    hPaddingStaticText = CreateWindow(_T("STATIC"), _T("PADDING"), WS_CHILD | WS_VISIBLE | SS_LEFT,
+                                0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
+    hPaddingComboBox = CreateWindow(_T("COMBOBOX"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | CBS_DROPDOWNLIST,
+                                0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
+    hInformatStaticText = CreateWindow(_T("STATIC"), _T("IN-FORMAT"), WS_CHILD | WS_VISIBLE | SS_LEFT,
+                                0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
+    hInformatComboBox = CreateWindow(_T("COMBOBOX"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | CBS_DROPDOWNLIST,
+                                0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
+    hOutformatStaticText = CreateWindow(_T("STATIC"), _T("OUT-FORMAT"), WS_CHILD | WS_VISIBLE | SS_LEFT,
+                                0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
+    hOutformatComboBox = CreateWindow(_T("COMBOBOX"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | CBS_DROPDOWNLIST,
+                                0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
+
+    hKeyStaticText = CreateWindow(_T("STATIC"), _T("KEY <HEX>"), WS_CHILD | WS_VISIBLE | SS_LEFT,
+                                0, 0, 0, 0, hWnd, NULL, NULL, NULL);
+    hKeyEditBox = CreateWindow(_T("EDIT"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | ES_AUTOHSCROLL,
+                                0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
+
+    hIVStaticText = CreateWindow(_T("STATIC"), _T("IV <HEX>"), WS_CHILD | WS_VISIBLE | SS_LEFT,
+                                0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
+    hIVEditBox = CreateWindow(_T("EDIT"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | ES_AUTOHSCROLL,
+                                0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
+
+    hInputStaticText = CreateWindow(_T("STATIC"), _T("INPUT"), WS_CHILD | WS_VISIBLE | SS_LEFT,
+                                0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
+    hInputEditBox = CreateWindow(_T("EDIT"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | ES_LEFT | ES_AUTOVSCROLL | ES_MULTILINE,
+                                0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
+
+    hOutputStaticText = CreateWindow(_T("STATIC"), _T("OUTPUT"), WS_CHILD | WS_VISIBLE | SS_LEFT,
+                                0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
+    hOutputEditBox = CreateWindow(_T("EDIT"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | ES_LEFT | ES_AUTOVSCROLL | ES_MULTILINE/*  | ES_READONLY */,
+                                0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
+
+    hEncryptButton = CreateWindow(_T("BUTTON"), _T("ENCRYPT"), WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                                0, 0, 0, 0, hWnd, (HMENU) WM_USER_ENCRYPT, hMainInstance, NULL);
+    hDecryptButton = CreateWindow(_T("BUTTON"), _T("DECRYPT"), WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                                0, 0, 0, 0, hWnd, (HMENU) WM_USER_DECRYPT, hMainInstance, NULL);
+
+    hCryptProgressBar = CreateWindow(PROGRESS_CLASS, NULL, /* WS_VISIBLE |  */WS_CHILD | PBS_SMOOTH,
+                                0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
+
+    for (i = 0; i < ARRAYSIZE(algorithmItems); ++i)
+        SendMessage(hAlgorithmComboBox, CB_ADDSTRING, 0, (LPARAM) algorithmItems[i]);
+	SETCBOPT(hAlgorithmComboBox, ALG_AES);
+    for (i = 0; i < ARRAYSIZE(modeItems); ++i)
+        SendMessage(hModeComboBox, CB_ADDSTRING, 0, (LPARAM) modeItems[i]);
+    SETCBOPT(hModeComboBox, MODE_CBC);
+    for (i = 0; i < ARRAYSIZE(paddingItems); ++i)
+        SendMessage(hPaddingComboBox, CB_ADDSTRING, 0, (LPARAM) paddingItems[i]);
+	SETCBOPT(hPaddingComboBox, PAD_NONE);
+    for (i = 0; i < ARRAYSIZE(informatItems); ++i)
+        SendMessage(hInformatComboBox, CB_ADDSTRING, 0, (LPARAM) informatItems[i]);
+	SETCBOPT(hInformatComboBox, IFMT_HEX);
+    for (i = 0; i < ARRAYSIZE(outformatItems); ++i)
+        SendMessage(hOutformatComboBox, CB_ADDSTRING, 0, (LPARAM) outformatItems[i]);
+	SETCBOPT(hOutformatComboBox, OFMT_HEX);
+
+    SendMessage(hInputEditBox, EM_SETLIMITTEXT, (WPARAM) (MAX_INFILE_SIZE * 5), 0);
+    SendMessage(hOutputEditBox, EM_SETLIMITTEXT, (WPARAM) (MAX_INFILE_SIZE * 5), 0);
+
+    onModeChanged(hWnd);
+    resizeWindows(hWnd);
+}
+
+static void onWindowDestroy(HWND hWnd)
+{
+    /* NOOP */
+}
+
+static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+    switch (uMsg) {
+    case WM_DROPFILES:
+        onDropFiles(hWnd, (HDROP) wParam);
+        return 0;
+
+    case WM_COMMAND:
+        switch (LOWORD(wParam)) {
+        case WM_USER_ALGORITHM:
+            if (HIWORD(wParam) == CBN_SELCHANGE)
+                onAlgorithmChanged(hWnd);
+            break;
+        case WM_USER_MODE:
+            if (HIWORD(wParam) == CBN_SELCHANGE)
+                onModeChanged(hWnd);
+            break;
+        case WM_USER_ENCRYPT:
+            onEncryptClicked(hWnd);
+            break;
+        case WM_USER_DECRYPT:
+            onDecryptClicked(hWnd);
+            break;
+        case WM_USER_THREAD:
+            onCryptThreadDone(hWnd, (CryptThreadParams*) lParam);
+            break;
+        }
+        return 0;
+
+    case WM_CREATE:
+        onWindowCreate(hWnd);
+        return 0;
+
+    case WM_DESTROY:
+        onWindowDestroy(hWnd);
+        // PostQuitMessage(0);
+        return 0;
+
+    default:
+        return DefWindowProc(hWnd, uMsg, wParam, lParam);
+    }
+}
+
+VOID SetSymmConfigItem(CONST TCHAR* name, CONST TCHAR* value)
+{
+    UINT i;
+#define __SELECT_OPTION(items, hbox) __SELECT_OPTION_EX(items, hbox, NULL)
+#define __SELECT_OPTION_EX(items, hbox, oper) \
+        for (i = 0; i < ARRAYSIZE(items); ++i) { \
+            if (!lstrcmp(value, items[i])) { \
+                SETCBOPT(hbox, i); \
+                oper; \
+                break; \
+            } \
+        }
+
+    if (!lstrcmp(name, _T("ALGRITHM"))) {
+        __SELECT_OPTION(algorithmItems, hAlgorithmComboBox);
+    } else if (!lstrcmp(name, _T("MODE"))) {
+        __SELECT_OPTION_EX(modeItems, hModeComboBox, onModeChanged(NULL));
+    } else if (!lstrcmp(name, _T("PADDING"))) {
+        __SELECT_OPTION(paddingItems, hPaddingComboBox);
+    } else if (!lstrcmp(name, _T("IN-FORMAT"))) {
+        __SELECT_OPTION(informatItems, hInformatComboBox);
+    } else if (!lstrcmp(name, _T("OUT-FORMAT"))) {
+        __SELECT_OPTION(outformatItems, hOutformatComboBox);
+    } else if (!lstrcmp(name, _T("KEY"))) {
+        SetWindowText(hKeyEditBox, value);
+    } else if (!lstrcmp(name, _T("IV"))) {
+        SetWindowText(hIVEditBox, value);
+    } else if (!lstrcmp(name, _T("INPUT"))) {
+        SetWindowText(hInputEditBox, value);
+    } else if (!lstrcmp(name, _T("OUTPUT"))) {
+        SetWindowText(hOutputEditBox, value);
+    }
+
+#undef __SELECT_OPTION_EX
+#undef __SELECT_OPTION
+}
+
+BOOL SymmWindowCloseCheck()
+{
+    if (hCryptThread && CONFIRM(_T("crypt thread running, exit?")) != IDOK)
+        return 1;
+    return 0;
+}
+
+HWND CreateSymmWindow(HWND hWnd)
+{
+    WNDCLASS wc;
+
+    wc.style = 0;
+    wc.lpfnWndProc = WndProc;
+    wc.cbClsExtra = 0;
+    wc.cbWndExtra = 0;
+    wc.hInstance = hMainInstance;
+    wc.hIcon = NULL;
+    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wc.hbrBackground = (HBRUSH) COLOR_WINDOW;
+    wc.lpszMenuName = NULL;
+    wc.lpszClassName = WND_CLASSNAME;
+
+    RegisterClass(&wc);
+
+    return CreateWindowEx(WS_EX_ACCEPTFILES, WND_CLASSNAME, NULL, WS_CHILD,
+                0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
+}

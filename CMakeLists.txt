@@ -2,10 +2,13 @@ cmake_minimum_required(VERSION 3.4)
 project(CryptoTool LANGUAGES C)
 
 add_executable(CryptoTool WIN32
-    main.c
-    endec.c
-    utils.c
+    mainWindow.c
+    symmWindow.c
+    digestWindow.c
+    common.c
+    encode.c
     ini.c
+    resource/CryptoTool.manifest
 )
 
 target_compile_definitions(CryptoTool PRIVATE
@@ -14,8 +17,7 @@ target_compile_definitions(CryptoTool PRIVATE
 
 target_sources(CryptoTool PRIVATE CryptoTool.rc)
 
-target_link_libraries(CryptoTool libcrypto)
-# target_link_libraries(CryptoTool libcrypto ComCtl32)
+target_link_libraries(CryptoTool libcrypto ComCtl32)
 
 target_include_directories(CryptoTool PRIVATE openssl/include)
 target_link_directories(CryptoTool PRIVATE openssl/lib)

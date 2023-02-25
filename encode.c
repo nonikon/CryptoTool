@@ -1,6 +1,7 @@
 #include <stdlib.h>
+#include <ctype.h>
 
-#include "encdec.h"
+#include "encode.h"
 
 static const char tb_hex_e[16] = {
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F',
@@ -199,7 +200,7 @@ int CStringCharsToBinary(char* s)
     return (int) (b - (unsigned char*) s);
 }
 
-char* BinaryToHexChars(unsigned char* b, unsigned l)
+char* BinaryToHexChars(const unsigned char* b, unsigned l)
 {
     char* s = malloc(l * 2 + 1);
     unsigned i;
@@ -210,15 +211,14 @@ char* BinaryToHexChars(unsigned char* b, unsigned l)
     }
 
     s[l * 2] = 0;
-    free(b);
     return s;
 }
 
-char* BinaryToBase64Chars(unsigned char* b, unsigned l)
+char* BinaryToBase64Chars(const unsigned char* b, unsigned l)
 {
     char* s = malloc((l + 2) / 3 * 4 + 1);
     char* _s = s;
-    unsigned char* _b = b;
+    const unsigned char* _b = b;
 
     while (l >= 3) {
         *_s++ = tb_base64_e[(_b[0] >> 2)];
@@ -243,11 +243,10 @@ char* BinaryToBase64Chars(unsigned char* b, unsigned l)
     }
     *_s = 0;
 
-    free(b);
     return s;
 }
 
-char* BinaryToCArrayChars(unsigned char* b, unsigned l)
+char* BinaryToCArrayChars(const unsigned char* b, unsigned l)
 {
     char* s = malloc(5 * l + 1); /* 0x00, */
     unsigned i;
@@ -261,11 +260,10 @@ char* BinaryToCArrayChars(unsigned char* b, unsigned l)
     }
 
     s[l * 5] = 0;
-    free(b);
     return s;
 }
 
-char* BinaryToCStringChars(unsigned char* b, unsigned l)
+char* BinaryToCStringChars(const unsigned char* b, unsigned l)
 {
     char* s = malloc(4 * l + 1); /* \x00 */
     unsigned i;
@@ -278,6 +276,5 @@ char* BinaryToCStringChars(unsigned char* b, unsigned l)
     }
 
     s[l * 4] = 0;
-    free(b);
     return s;
 }
