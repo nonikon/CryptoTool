@@ -87,6 +87,7 @@ static void onDropFiles(HWND hWnd, HDROP hDrop)
 
     if (IsFile(buf)) {
         SetWindowText(hInputEditBox, buf);
+        SETCBOPT(hInformatComboBox, IFMT_FILE);
     }
 
     DragFinish(hDrop);

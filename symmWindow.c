@@ -96,6 +96,8 @@ static void onDropFiles(HWND hWnd, HDROP hDrop)
         SetWindowText(hInputEditBox, buf);
         memcpy(buf + len, _T(".out"), sizeof(TCHAR) * 4);
         SetWindowText(hOutputEditBox, buf);
+        SETCBOPT(hInformatComboBox, IFMT_FILE);
+        SETCBOPT(hOutformatComboBox, OFMT_FILE);
     }
 
     DragFinish(hDrop);
