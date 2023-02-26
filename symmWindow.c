@@ -26,6 +26,7 @@ typedef struct stCryptThreadParams {
 
 static HANDLE hCryptThread;
 static CryptThreadParams cryptThreadParams;
+static BOOL bCryptThreadCanceled;
 
 static HWND hAlgorithmStaticText;
 static HWND hAlgorithmComboBox;
@@ -206,6 +207,10 @@ static DWORD doCryptFile(VOID* arg)
     wBuf = malloc(FILE_RBUF_SIZE + EVP_MAX_BLOCK_LENGTH); /* big enough to store encrypt/decrypt result */
 
     while (1) {
+        if (bCryptThreadCanceled) {
+            wsprintf(params->errorMsg, _T("crypt thread canceled"));
+            goto done;
+        }
         ReadFile(hIn, rBuf, FILE_RBUF_SIZE, &nReadWrite, NULL);
 
         if (!nReadWrite) {
@@ -479,7 +484,7 @@ static void doCrypt(HWND hWnd, BOOL isDec)
             /* input file size needs to be a multiple of block size when MODE is ECB/CBC and padding is OFF. */
             cryptThreadParams.needChkSize = isPaddingNeeded(alg, mode) && pad == PAD_NONE;
         }
-
+        bCryptThreadCanceled = FALSE;
         hCryptThread = CreateThread(NULL, 0, doCryptFile, &cryptThreadParams, 0, NULL);
         if (!hCryptThread) {
             WARN(_T("create crypt thread failed"));
@@ -734,6 +739,9 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
             break;
         case WM_USER_THREAD:
             onCryptThreadDone(hWnd, (CryptThreadParams*) lParam);
+            break;
+        case IDC_ACC_STOP:
+            bCryptThreadCanceled = TRUE;
             break;
         }
         return 0;

@@ -173,11 +173,11 @@ static BOOL onTabNotified(HWND hWnd, UINT code)
     }
 }
 
-static void onWindowDone(HWND hWnd)
+static void sendCmdToCurTabWnd(HWND hWnd, INT cmd)
 {
     HWND hTabWnd = hTabWnds[TabCtrl_GetCurSel(hMainTab)];
 
-    SendMessage(hTabWnd, WM_COMMAND, (WPARAM) IDC_ACC_DONE, 0);
+    SendMessage(hTabWnd, WM_COMMAND, (WPARAM) cmd, 0);
 }
 
 static void onWindowClose(HWND hWnd)
@@ -214,7 +214,10 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
             onWindowClose(hWnd);
             break;
         case IDC_ACC_DONE:
-            onWindowDone(hWnd);
+            sendCmdToCurTabWnd(hWnd, IDC_ACC_DONE);
+            break;
+        case IDC_ACC_STOP:
+            sendCmdToCurTabWnd(hWnd, IDC_ACC_STOP);
             break;
         case IDC_ACC_NEXT:
             switchTabTo((TabCtrl_GetCurFocus(hMainTab) + 1) % ARRAYSIZE(hTabWnds));

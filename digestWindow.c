@@ -29,6 +29,7 @@ typedef struct stDigestThreadParams {
 
 static HANDLE hDigestThread;
 static DigestThreadParams digestThreadParams;
+static BOOL bDigestThreadCanceled;
 
 static HWND hAlgorithmStaticText;
 static HWND hAlgorithmComboBox;
@@ -181,6 +182,10 @@ static DWORD doDigestFile(VOID* arg)
     rBuf = malloc(FILE_RBUF_SIZE);
 
     while (1) {
+        if (bDigestThreadCanceled) {
+            wsprintf(params->errorMsg, _T("digest thread canceled"));
+            goto done;
+        }
         ReadFile(hIn, rBuf, FILE_RBUF_SIZE, &nRead, NULL);
 
         if (!nRead) {
@@ -362,6 +367,7 @@ static void onDigestClicked(HWND hWnd)
             digestThreadParams.keyl = keyl;
         digestThreadParams.outfmt = outfmt;
 
+        bDigestThreadCanceled = FALSE;
         hDigestThread = CreateThread(NULL, 0, doDigestFile, &digestThreadParams, 0, NULL);
         if (!hDigestThread) {
             WARN(_T("create digest thread failed"));
@@ -540,6 +546,9 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
             break;
         case WM_USER_THREAD:
             onDigestThreadDone(hWnd, (DigestThreadParams*) lParam);
+            break;
+        case IDC_ACC_STOP:
+            bDigestThreadCanceled = TRUE;
             break;
         }
         return 0;

@@ -97,8 +97,8 @@ static void resizeWindows(HWND hWnd)
 
     MoveWindow(hOutputStaticText, iAlign, h, w / 2 - iAlign, iLineH, FALSE);
     h += iLineH;
-    MoveWindow(hOutputEditBox, iAlign, h, w - iAlign * 2, iLineH * 17 + iAlign * 4, FALSE);
-    h += iLineH * 17 + iAlign * 4;
+    MoveWindow(hOutputEditBox, iAlign, h, w - iAlign * 2, iLineH * 17 + iAlign * 3, FALSE);
+    h += iLineH * 17 + iAlign * 3 + iAlign;
 
     MoveWindow(hRandomButton, w / 2 - iButtonW / 2, h, iButtonW, iLineH, FALSE);
     h += iLineH + iAlign;

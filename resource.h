@@ -5,3 +5,4 @@
 #define IDC_ACC_EXIT            11000
 #define IDC_ACC_DONE            11001
 #define IDC_ACC_NEXT            11002
+#define IDC_ACC_STOP            11003
