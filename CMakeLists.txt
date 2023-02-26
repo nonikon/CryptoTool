@@ -5,6 +5,7 @@ add_executable(CryptoTool WIN32
     mainWindow.c
     symmWindow.c
     digestWindow.c
+    randomWindow.c
     common.c
     encode.c
     ini.c

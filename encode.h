@@ -1,6 +1,7 @@
 #ifndef _ENCODE_H_
 #define _ENCODE_H_
 
+unsigned AsciiToInteger(const char* str, char** ep, unsigned base);
 int TrimSpace(char* s);
 
 int HexCharsToBinary(char* s);

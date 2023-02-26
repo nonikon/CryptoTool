@@ -7,39 +7,49 @@
 HINSTANCE hMainInstance;
 HWND hMainWindow;
 
-static HFONT hDefaultFont;
+static HFONT hContentFont;
+static HFONT hTitleFont;
 static HWND hMainTab;
 
 static HWND hTabWnds[] = {
-    NULL, NULL,
+    NULL, NULL, NULL
 };
 static CONST TCHAR* tabItems[] = {
-    _T("SYMM"), _T("DIGEST"),
+    _T("SYMM"), _T("DIGEST"), _T("RANDOM"),
 };
 enum {
-    TAB_SYMM, TAB_DGST,
+    TAB_SYMM, TAB_DGST, TAB_RANDOM,
 };
 
 static void resizeWindows(HWND hWnd)
 {
     CONST UINT iDpi = GetDpiForSystem();
+    CONST UINT iFontSz = MulDiv(WND_FONTSIZE, iDpi, 96);
     HFONT hFont;
     RECT tRect;
     RECT wRect; /* window rect */
     RECT cRect;	/* client rect */
     INT w, h, i;
 
-    hFont = CreateFont(MulDiv(WND_FONTSIZE, iDpi, 96), 0, 0, 0, FW_NORMAL, 0, 0, 0,
+    hFont = CreateFont(iFontSz, 0, 0, 0, FW_MEDIUM, 0, 0, 0,
                 DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
                 CLEARTYPE_QUALITY, DEFAULT_PITCH, WND_FONTNAME);
-
-    SetChildWindowsFont(hTabWnds[TAB_SYMM], hFont);
-    SetChildWindowsFont(hTabWnds[TAB_DGST], hFont);
     SetChildWindowsFont(hWnd, hFont);
+    if (hTitleFont) {
+        DeleteObject(hTitleFont);
+    }
+    hTitleFont = hFont;
 
-    if (hDefaultFont)
-        DeleteObject(hDefaultFont);
-    hDefaultFont = hFont;
+    hFont = CreateFont(iFontSz, 0, 0, 0, FW_NORMAL, 0, 0, 0,
+                DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                CLEARTYPE_QUALITY, DEFAULT_PITCH, WND_FONTNAME);
+    for (i = 0; i < ARRAYSIZE(hTabWnds); ++i) {
+        SetChildWindowsFont(hTabWnds[i], hFont);
+    }
+    if (hContentFont) {
+        DeleteObject(hContentFont);
+    }
+    hContentFont = hFont;
 
     GetClientRect(hTabWnds[TAB_SYMM], &tRect);
 
@@ -82,6 +92,7 @@ static int onConfigItem(void* user, const char* section,
 {
     static TCHAR symmSecName[32] = _T("SYMM");
     static TCHAR dgstSecName[32] = _T("DIGEST");
+    static TCHAR randSecName[32] = _T("RANDOM");
     int i;
 
     if (!section[0]) {
@@ -100,11 +111,17 @@ static int onConfigItem(void* user, const char* section,
             if (value[0]) {
                 lstrcpyn(dgstSecName, value, sizeof(dgstSecName));
             }
+        } else if (!lstrcmp(name, _T("RANDCFG"))) {
+            if (value[0]) {
+                lstrcpyn(randSecName, value, sizeof(randSecName));
+            }
         }
     } else if (!lstrcmp(section, symmSecName)) {
         OnSymmConfigItem(name, value);
     } else if (!lstrcmp(section, dgstSecName)) {
         OnDigestConfigItem(name, value);
+    } else if (!lstrcmp(section, randSecName)) {
+        OnRandomConfigItem(name, value);
     }
 
     return 1;
@@ -126,6 +143,10 @@ static void onWindowCreate(HWND hWnd)
     hTabWnds[TAB_DGST] = CreateDigestWindow(hMainTab);
     tci.pszText = (PSTR) tabItems[TAB_DGST];
     SendMessage(hMainTab, TCM_INSERTITEM, (WPARAM) TAB_DGST, (LPARAM) &tci);
+
+    hTabWnds[TAB_RANDOM] = CreateRandomWindow(hMainTab);
+    tci.pszText = (PSTR) tabItems[TAB_RANDOM];
+    SendMessage(hMainTab, TCM_INSERTITEM, (WPARAM) TAB_RANDOM, (LPARAM) &tci);
 
     resizeWindows(hWnd);
     switchTabTo(TAB_SYMM);
@@ -162,14 +183,16 @@ static void onWindowDone(HWND hWnd)
 static void onWindowClose(HWND hWnd)
 {
     if (!OnSymmWindowClose()
-            && !OnDigestWindowClose()) {
+            && !OnDigestWindowClose()
+            && !OnRandomWindowClose()) {
         DestroyWindow(hWnd);
     }
 }
 
 static void onWindowDestroy(HWND hWnd)
 {
-    DeleteObject(hDefaultFont);
+    DeleteObject(hTitleFont);
+    DeleteObject(hContentFont);
 }
 
 static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
