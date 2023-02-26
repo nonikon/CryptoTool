@@ -57,7 +57,7 @@ int TrimSpace(char* s)
     unsigned i = 0, j = 0;
 
     while (s[i]) {
-        if (!isspace(s[i])) {
+        if (!isspace(s[i] & 0xFF)) {
             if (i != j) {
                 s[j] = s[i];
             }
