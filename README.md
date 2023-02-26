@@ -11,3 +11,4 @@ Or download the exeutable directly from the [Release](https://github.com/nonikon
 ![avatar](https://github.com/nonikon/CryptoTool/raw/master/screenshot/1.png)
 ![avatar](https://github.com/nonikon/CryptoTool/raw/master/screenshot/2.png)
 ![avatar](https://github.com/nonikon/CryptoTool/raw/master/screenshot/3.png)
+![avatar](https://github.com/nonikon/CryptoTool/raw/master/screenshot/4.png)
