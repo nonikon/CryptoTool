@@ -61,16 +61,16 @@ enum {
     BITS_128, BITS_224, BITS_256, BITS_384, BITS_512,
 };
 static CONST TCHAR* informatItems[] = {
-    _T("HEX"), _T("BASE64"), _T("C-ARRAY"), _T("C-STRING"), _T("FILE"),
+    _T("BASE64"), _T("C-ARRAY"), _T("C-STRING"), _T("FILE"), _T("HEX"), _T("TEXT"),
 };
 enum {
-    IFMT_HEX, IFMT_BASE64, IFMT_C_ARRAY, IFMT_C_STRING, IFMT_FILE,
+    IFMT_BASE64, IFMT_C_ARRAY, IFMT_C_STRING, IFMT_FILE, IFMT_HEX, IFMT_TEXT,
 };
 static CONST TCHAR* outformatItems[] = {
-    _T("HEX"), _T("BASE64"), _T("C-ARRAY"), _T("C-STRING"),
+    _T("BASE64"), _T("C-ARRAY"), _T("C-STRING"), _T("HEX"),
 };
 enum {
-    OFMT_HEX, OFMT_BASE64, OFMT_C_ARRAY, OFMT_C_STRING,
+    OFMT_BASE64, OFMT_C_ARRAY, OFMT_C_STRING, OFMT_HEX,
 };
 
 
@@ -338,6 +338,9 @@ static void onDigestClicked(HWND hWnd)
         break;
     case IFMT_C_STRING:
         __CONVERT_INPUT(CStringCharsToBinary, _T("INPUT is not a C-STRING string"));
+        break;
+    case IFMT_TEXT:
+        __CONVERT_INPUT(TextCharsToBinary, _T("INPUT is not a TEXT string"));
         break;
     case IFMT_FILE:
         /* start digest file int the thread. */

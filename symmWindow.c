@@ -68,16 +68,16 @@ enum {
     PAD_NONE, PAD_PKCS,
 };
 static CONST TCHAR* informatItems[] = {
-    _T("HEX"), _T("BASE64"), _T("C-ARRAY"), _T("C-STRING"), _T("FILE"),
+    _T("BASE64"), _T("C-ARRAY"), _T("C-STRING"), _T("FILE"), _T("HEX"), _T("TEXT"),
 };
 enum {
-    IFMT_HEX, IFMT_BASE64, IFMT_C_ARRAY, IFMT_C_STRING, IFMT_FILE,
+    IFMT_BASE64, IFMT_C_ARRAY, IFMT_C_STRING, IFMT_FILE, IFMT_HEX, IFMT_TEXT,
 };
 static CONST TCHAR* outformatItems[] = {
-    _T("HEX"), _T("BASE64"), _T("C-ARRAY"), _T("C-STRING"), _T("FILE"),
+    _T("BASE64"), _T("C-ARRAY"), _T("C-STRING"), _T("FILE"), _T("HEX"), _T("TEXT"),
 };
 enum {
-    OFMT_HEX, OFMT_BASE64, OFMT_C_ARRAY, OFMT_C_STRING, OFMT_FILE,
+    OFMT_BASE64, OFMT_C_ARRAY, OFMT_C_STRING, OFMT_FILE, OFMT_HEX, OFMT_TEXT,
 };
 
 
@@ -441,6 +441,9 @@ static void doCrypt(HWND hWnd, BOOL isDec)
     case IFMT_C_STRING:
         __CONVERT_INPUT(CStringCharsToBinary, _T("INPUT is not a C-STRING string"));
         break;
+    case IFMT_TEXT:
+        __CONVERT_INPUT(TextCharsToBinary, _T("INPUT is not a TEXT string"));
+        break;
     case IFMT_FILE:
         if (outfmt != OFMT_FILE) {
             TCHAR* _in;
@@ -528,6 +531,10 @@ static void doCrypt(HWND hWnd, BOOL isDec)
         break;
     case OFMT_C_STRING:
         outs = BinaryToCStringChars(out, outl);
+        SetWindowText(hOutputEditBox, outs);
+        break;
+    case OFMT_TEXT:
+        outs = BinaryToTextChars(out, outl);
         SetWindowText(hOutputEditBox, outs);
         break;
     case OFMT_FILE:

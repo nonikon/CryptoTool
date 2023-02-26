@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include <ctype.h>
 
 #include "encode.h"
@@ -200,6 +201,13 @@ int CStringCharsToBinary(char* s)
     return (int) (b - (unsigned char*) s);
 }
 
+
+int TextCharsToBinary(char* s)
+{
+    /* currently do nothing */
+    return (int) strlen(s);
+}
+
 char* BinaryToHexChars(const unsigned char* b, unsigned l)
 {
     char* s = malloc(l * 2 + 1);
@@ -276,5 +284,15 @@ char* BinaryToCStringChars(const unsigned char* b, unsigned l)
     }
 
     s[l * 4] = 0;
+    return s;
+}
+
+char* BinaryToTextChars(const unsigned char* b, unsigned l)
+{
+    char* s = malloc(l + 1);
+
+    /* currently do nothing */
+    memcpy(s, b, l);
+    s[l] = 0;
     return s;
 }
