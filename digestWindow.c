@@ -478,7 +478,7 @@ static void onWindowCreate(HWND hWnd)
     hOutputEditBox = CreateWindow(_T("EDIT"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | ES_LEFT | ES_AUTOVSCROLL | ES_MULTILINE/*  | ES_READONLY */,
                                 0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
 
-    hDigestButton = CreateWindow(_T("BUTTON"), _T("DIGEST"), WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+    hDigestButton = CreateWindow(_T("BUTTON"), _T("DIGEST"), WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
                                 0, 0, 0, 0, hWnd, (HMENU) WM_USER_DIGEST, hMainInstance, NULL);
 
     hDigestProgressBar = CreateWindow(PROGRESS_CLASS, NULL, /* WS_VISIBLE |  */WS_CHILD | PBS_SMOOTH,
@@ -498,7 +498,7 @@ static void onWindowCreate(HWND hWnd)
 	SETCBOPT(hOutformatComboBox, OFMT_HEX);
 
     SendMessage(hInputEditBox, EM_SETLIMITTEXT, (WPARAM) (MAX_INFILE_SIZE * 5), 0);
-    SendMessage(hOutputEditBox, EM_SETLIMITTEXT, (WPARAM) (MAX_INFILE_SIZE * 5), 0);
+    // SendMessage(hOutputEditBox, EM_SETLIMITTEXT, (WPARAM) (MAX_INFILE_SIZE * 5), 0);
 
     onHMacClicked(hWnd);
     onAlgorithmChanged(hWnd);
@@ -525,6 +525,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
         case WM_USER_HMAC:
             onHMacClicked(hWnd);
             break;
+        case IDC_ACC_DONE:
         case WM_USER_DIGEST:
             onDigestClicked(hWnd);
             break;
@@ -548,7 +549,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
     }
 }
 
-VOID SetDigestConfigItem(CONST TCHAR* name, CONST TCHAR* value)
+VOID OnDigestConfigItem(CONST TCHAR* name, CONST TCHAR* value)
 {
     UINT i;
 #define __SELECT_OPTION(items, hbox) __SELECT_OPTION_EX(items, hbox, NULL)
@@ -589,7 +590,7 @@ VOID SetDigestConfigItem(CONST TCHAR* name, CONST TCHAR* value)
 #undef __SELECT_OPTION
 }
 
-BOOL DigestWindowCloseCheck()
+BOOL OnDigestWindowClose()
 {
     if (hDigestThread && CONFIRM(_T("digest thread running, exit?")) != IDOK)
         return TRUE;

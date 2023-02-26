@@ -6,6 +6,7 @@
 #include <tchar.h>
 
 #include "common.h"
+#include "resource.h"
 
 #define VERSION_STRING      _T("V2.0-DEV")
 
@@ -27,10 +28,10 @@ extern HWND hMainWindow;
 HWND CreateSymmWindow(HWND hWnd);
 HWND CreateDigestWindow(HWND hWnd);
 
-BOOL SymmWindowCloseCheck();
-BOOL DigestWindowCloseCheck();
+BOOL OnSymmWindowClose();
+BOOL OnDigestWindowClose();
 
-VOID SetSymmConfigItem(CONST TCHAR* name, CONST TCHAR* value);
-VOID SetDigestConfigItem(CONST TCHAR* name, CONST TCHAR* value);
+VOID OnSymmConfigItem(CONST TCHAR* name, CONST TCHAR* value);
+VOID OnDigestConfigItem(CONST TCHAR* name, CONST TCHAR* value);
 
 #endif

@@ -661,7 +661,7 @@ static void onWindowCreate(HWND hWnd)
     hOutputEditBox = CreateWindow(_T("EDIT"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | ES_LEFT | ES_AUTOVSCROLL | ES_MULTILINE/*  | ES_READONLY */,
                                 0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
 
-    hEncryptButton = CreateWindow(_T("BUTTON"), _T("ENCRYPT"), WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+    hEncryptButton = CreateWindow(_T("BUTTON"), _T("ENCRYPT"), WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
                                 0, 0, 0, 0, hWnd, (HMENU) WM_USER_ENCRYPT, hMainInstance, NULL);
     hDecryptButton = CreateWindow(_T("BUTTON"), _T("DECRYPT"), WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
                                 0, 0, 0, 0, hWnd, (HMENU) WM_USER_DECRYPT, hMainInstance, NULL);
@@ -711,6 +711,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
             if (HIWORD(wParam) == CBN_SELCHANGE)
                 onAlgorithmOrModeChanged(hWnd);
             break;
+        case IDC_ACC_DONE:
         case WM_USER_ENCRYPT:
             onEncryptClicked(hWnd);
             break;
@@ -737,7 +738,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
     }
 }
 
-VOID SetSymmConfigItem(CONST TCHAR* name, CONST TCHAR* value)
+VOID OnSymmConfigItem(CONST TCHAR* name, CONST TCHAR* value)
 {
     UINT i;
 #define __SELECT_OPTION(items, hbox) __SELECT_OPTION_EX(items, hbox, NULL)
@@ -774,7 +775,7 @@ VOID SetSymmConfigItem(CONST TCHAR* name, CONST TCHAR* value)
 #undef __SELECT_OPTION
 }
 
-BOOL SymmWindowCloseCheck()
+BOOL OnSymmWindowClose()
 {
     if (hCryptThread && CONFIRM(_T("crypt thread running, exit?")) != IDOK)
         return TRUE;

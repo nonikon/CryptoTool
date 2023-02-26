@@ -87,9 +87,9 @@ static int onConfigItem(void* user, const char* section,
             }
         }
     } else if (!lstrcmp(section, symmSecName)) {
-        SetSymmConfigItem(name, value);
+        OnSymmConfigItem(name, value);
     } else if (!lstrcmp(section, dgstSecName)) {
-        SetDigestConfigItem(name, value);
+        OnDigestConfigItem(name, value);
     }
 
     return 1;
@@ -147,6 +147,21 @@ static BOOL onTabNotified(HWND hWnd, UINT code)
     }
 }
 
+static void onWindowDone(HWND hWnd)
+{
+    HWND hTabWnd = hTabWnds[TabCtrl_GetCurSel(hMainTab)];
+
+    SendMessage(hTabWnd, WM_COMMAND, (WPARAM) IDC_ACC_DONE, 0);
+}
+
+static void onWindowClose(HWND hWnd)
+{
+    if (!OnSymmWindowClose()
+            && !OnDigestWindowClose()) {
+        DestroyWindow(hWnd);
+    }
+}
+
 static void onWindowDestroy(HWND hWnd)
 {
     DeleteObject(hDefaultFont);
@@ -162,16 +177,20 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
         onWindowCreate(hWnd);
         return 0;
 
-    case WM_KEYDOWN:
-        if (wParam != VK_ESCAPE) // TODO, will captured by child window...
+    case WM_COMMAND:
+        switch (LOWORD(wParam)) {
+        case IDC_ACC_EXIT:
+            onWindowClose(hWnd);
             return 0;
-        /* fall through */
+        case IDC_ACC_DONE:
+            onWindowDone(hWnd);
+            return 0;
+        default:
+            return 0;
+        }
+
     case WM_CLOSE:
-        if (SymmWindowCloseCheck())
-            return 0;
-        if (DigestWindowCloseCheck())
-            return 0;
-        DestroyWindow(hWnd);
+        onWindowClose(hWnd);
         return 0;
 
     case WM_DESTROY:
@@ -189,6 +208,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCm
     INITCOMMONCONTROLSEX ic;
     WNDCLASSEX wc;
     MSG msg;
+    HACCEL acc;
 
     ic.dwSize = sizeof(INITCOMMONCONTROLSEX);
     ic.dwICC = ICC_TAB_CLASSES | ICC_PROGRESS_CLASS;
@@ -210,6 +230,8 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCm
 
     RegisterClassEx(&wc);
 
+    acc = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDA_CRYPT_MAIN));
+
     hMainInstance = hInstance;
     hMainWindow = CreateWindow(WND_CLASSNAME, WND_TITLE,
                         WS_SYSMENU | WS_MINIMIZEBOX,
@@ -219,8 +241,10 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCm
     UpdateWindow(hMainWindow);
 
     while (GetMessage(&msg, NULL, 0, 0)) {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
+        if (!TranslateAccelerator(hMainWindow, acc, &msg)) {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
     }
 
     return 0;

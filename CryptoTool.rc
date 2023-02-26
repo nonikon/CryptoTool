@@ -1,4 +1,14 @@
+#include <winuser.h>
 #include "resource.h"
 
 IDI_CRYPT_MAIN      ICON    "resource\CryptoTool.ico"
 IDI_CRYPT_MAIN_SM   ICON    "resource\CryptoToolSmall.ico"
+
+; https://learn.microsoft.com/en-us/windows/win32/menurc/using-keyboard-accelerators
+
+IDA_CRYPT_MAIN ACCELERATORS
+BEGIN
+    VK_ESCAPE, IDC_ACC_EXIT, ASCII              ; ESC
+    VK_RETURN, IDC_ACC_DONE, CONTROL, VIRTKEY   ; CTRL+ENTER
+    VK_RETURN, IDC_ACC_DONE, ALT, VIRTKEY       ; ALT+ENTER
+END
