@@ -22,10 +22,24 @@ enum {
 
 static void resizeWindows(HWND hWnd)
 {
+    CONST UINT iDpi = GetDpiForSystem();
+    HFONT hFont;
     RECT tRect;
     RECT wRect; /* window rect */
     RECT cRect;	/* client rect */
     INT w, h, i;
+
+    hFont = CreateFont(MulDiv(WND_FONTSIZE, iDpi, 96), 0, 0, 0, FW_NORMAL, 0, 0, 0,
+                DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                CLEARTYPE_QUALITY, DEFAULT_PITCH, WND_FONTNAME);
+
+    SetChildWindowsFont(hTabWnds[TAB_SYMM], hFont);
+    SetChildWindowsFont(hTabWnds[TAB_DGST], hFont);
+    SetChildWindowsFont(hWnd, hFont);
+
+    if (hDefaultFont)
+        DeleteObject(hDefaultFont);
+    hDefaultFont = hFont;
 
     GetClientRect(hTabWnds[TAB_SYMM], &tRect);
 
@@ -48,6 +62,7 @@ static void resizeWindows(HWND hWnd)
     GetClientRect(hWnd, &cRect);
     w += cRect.left - wRect.left + wRect.right - cRect.right;
     h += cRect.top - wRect.top + wRect.bottom - cRect.bottom;
+
     /* move to center of the screen */
     MoveWindow(hWnd, (GetSystemMetrics(SM_CXSCREEN) - w) / 2,
         (GetSystemMetrics(SM_CYSCREEN) - h) / 2, w, h, TRUE);
@@ -99,12 +114,6 @@ static void onWindowCreate(HWND hWnd)
 {
     TCITEM tci;
 
-    hDefaultFont = CreateFont(WND_FONTSIZE, 0, 0, 0,
-                        FW_NORMAL, 0, 0, 0,
-                        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                        DEFAULT_QUALITY, DEFAULT_PITCH,
-                        WND_FONTNAME);
-
     hMainTab = CreateWindow(WC_TABCONTROL, NULL, WS_VISIBLE | WS_CHILD/*  | WS_CLIPSIBLINGS */,
                     0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
 
@@ -118,12 +127,8 @@ static void onWindowCreate(HWND hWnd)
     tci.pszText = (PSTR) tabItems[TAB_DGST];
     SendMessage(hMainTab, TCM_INSERTITEM, (WPARAM) TAB_DGST, (LPARAM) &tci);
 
-    SetChildWindowsFont(hTabWnds[TAB_SYMM], hDefaultFont);
-    SetChildWindowsFont(hTabWnds[TAB_DGST], hDefaultFont);
-    SetChildWindowsFont(hWnd, hDefaultFont);
-
-    switchTabTo(TAB_SYMM);
     resizeWindows(hWnd);
+    switchTabTo(TAB_SYMM);
 
     ini_parse(CONFIG_FILENAME, onConfigItem, NULL);
 }
@@ -172,6 +177,9 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
     switch (uMsg) {
     case WM_NOTIFY:
         return onTabNotified(((LPNMHDR) lParam)->hwndFrom, ((LPNMHDR) lParam)->code);
+
+    // case WM_DPICHANGED:
+    //     return 0;
 
     case WM_CREATE:
         onWindowCreate(hWnd);

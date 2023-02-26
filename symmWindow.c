@@ -567,51 +567,56 @@ static void onDecryptClicked(HWND hWnd)
 
 static void resizeWindows(HWND hWnd)
 {
-    INT w = WND_ALIGN;
-    INT h = WND_ALIGN;
+    CONST UINT iDpi = GetDpiForSystem();
+    CONST UINT iAlign = MulDiv(WND_ALIGN, iDpi, 96);
+    CONST UINT iLineH = MulDiv(WND_LINEH, iDpi, 96);
+    CONST UINT iComboxW = MulDiv(WND_COMBOXW, iDpi, 96);
+    CONST UINT iButtonW = MulDiv(WND_BUTTONW, iDpi, 96);
+    UINT w = iAlign;
+    UINT h = iAlign;
 
-    MoveWindow(hAlgorithmStaticText, w, h, WND_COMBOXW, WND_LINEH, FALSE);
-    MoveWindow(hAlgorithmComboBox, w, h + WND_LINEH, WND_COMBOXW, WND_LINEH, FALSE);
-    w += WND_COMBOXW + WND_ALIGN;
-    MoveWindow(hModeStaticText, w, h, WND_COMBOXW, WND_LINEH, FALSE);
-    MoveWindow(hModeComboBox, w, h + WND_LINEH, WND_COMBOXW, WND_LINEH, FALSE);
-    w += WND_COMBOXW + WND_ALIGN;
-    MoveWindow(hPaddingStaticText, w, h, WND_COMBOXW, WND_LINEH, FALSE);
-    MoveWindow(hPaddingComboBox, w, h + WND_LINEH, WND_COMBOXW, WND_LINEH, FALSE);
-    w += WND_COMBOXW + WND_ALIGN;
-    MoveWindow(hInformatStaticText, w, h, WND_COMBOXW, WND_LINEH, FALSE);
-    MoveWindow(hInformatComboBox, w, h + WND_LINEH, WND_COMBOXW, WND_LINEH, FALSE);
-    w += WND_COMBOXW + WND_ALIGN;
-    MoveWindow(hOutformatStaticText, w, h, WND_COMBOXW, WND_LINEH, FALSE);
-    MoveWindow(hOutformatComboBox, w, h + WND_LINEH, WND_COMBOXW, WND_LINEH, FALSE);
-    w += WND_COMBOXW + WND_ALIGN;
+    MoveWindow(hAlgorithmStaticText, w, h, iComboxW, iLineH, FALSE);
+    MoveWindow(hAlgorithmComboBox, w, h + iLineH, iComboxW, iLineH, FALSE);
+    w += iComboxW + iAlign;
+    MoveWindow(hModeStaticText, w, h, iComboxW, iLineH, FALSE);
+    MoveWindow(hModeComboBox, w, h + iLineH, iComboxW, iLineH, FALSE);
+    w += iComboxW + iAlign;
+    MoveWindow(hPaddingStaticText, w, h, iComboxW, iLineH, FALSE);
+    MoveWindow(hPaddingComboBox, w, h + iLineH, iComboxW, iLineH, FALSE);
+    w += iComboxW + iAlign;
+    MoveWindow(hInformatStaticText, w, h, iComboxW, iLineH, FALSE);
+    MoveWindow(hInformatComboBox, w, h + iLineH, iComboxW, iLineH, FALSE);
+    w += iComboxW + iAlign;
+    MoveWindow(hOutformatStaticText, w, h, iComboxW, iLineH, FALSE);
+    MoveWindow(hOutformatComboBox, w, h + iLineH, iComboxW, iLineH, FALSE);
+    w += iComboxW + iAlign;
 
-    h += WND_LINEH + WND_LINEH + WND_ALIGN;
+    h += iLineH + iLineH + iAlign;
 
-    MoveWindow(hKeyStaticText, WND_ALIGN, h, w - WND_ALIGN * 2, WND_LINEH, FALSE);
-    h += WND_LINEH;
-    MoveWindow(hKeyEditBox, WND_ALIGN, h, w - WND_ALIGN * 2, WND_LINEH, FALSE);
-    h += WND_LINEH + WND_ALIGN;
+    MoveWindow(hKeyStaticText, iAlign, h, w - iAlign * 2, iLineH, FALSE);
+    h += iLineH;
+    MoveWindow(hKeyEditBox, iAlign, h, w - iAlign * 2, iLineH, FALSE);
+    h += iLineH + iAlign;
 
-    MoveWindow(hIVStaticText, WND_ALIGN, h, w - WND_ALIGN * 2, WND_LINEH, FALSE);
-    h += WND_LINEH;
-    MoveWindow(hIVEditBox, WND_ALIGN, h, w - WND_ALIGN * 2, WND_LINEH, FALSE);
-    h += WND_LINEH + WND_ALIGN;
+    MoveWindow(hIVStaticText, iAlign, h, w - iAlign * 2, iLineH, FALSE);
+    h += iLineH;
+    MoveWindow(hIVEditBox, iAlign, h, w - iAlign * 2, iLineH, FALSE);
+    h += iLineH + iAlign;
 
-    MoveWindow(hInputStaticText, WND_ALIGN, h, w - WND_ALIGN * 2, WND_LINEH, FALSE);
-    h += WND_LINEH;
-    MoveWindow(hInputEditBox, WND_ALIGN, h, w - WND_ALIGN * 2, WND_LINEH * 6, FALSE);
-    h += WND_LINEH * 6 + WND_ALIGN;
+    MoveWindow(hInputStaticText, iAlign, h, w - iAlign * 2, iLineH, FALSE);
+    h += iLineH;
+    MoveWindow(hInputEditBox, iAlign, h, w - iAlign * 2, iLineH * 6, FALSE);
+    h += iLineH * 6 + iAlign;
 
-    MoveWindow(hOutputStaticText, WND_ALIGN, h, w / 2 - WND_ALIGN, WND_LINEH, FALSE);
-    h += WND_LINEH;
-    MoveWindow(hOutputEditBox, WND_ALIGN, h, w - WND_ALIGN * 2, WND_LINEH * 6, FALSE);
-    h += WND_LINEH * 6 + WND_ALIGN;
+    MoveWindow(hOutputStaticText, iAlign, h, w / 2 - iAlign, iLineH, FALSE);
+    h += iLineH;
+    MoveWindow(hOutputEditBox, iAlign, h, w - iAlign * 2, iLineH * 6, FALSE);
+    h += iLineH * 6 + iAlign;
 
-    MoveWindow(hCryptProgressBar, WND_ALIGN, h, w / 2 - WND_BUTTONW - WND_ALIGN / 2 - WND_ALIGN * 2, WND_LINEH, FALSE);
-    MoveWindow(hEncryptButton, w / 2 - WND_BUTTONW - WND_ALIGN / 2, h, WND_BUTTONW, WND_LINEH, FALSE);
-    MoveWindow(hDecryptButton, w / 2 + WND_ALIGN / 2, h, WND_BUTTONW, WND_LINEH, FALSE);
-    h += WND_LINEH + WND_ALIGN;
+    MoveWindow(hCryptProgressBar, iAlign, h, w / 2 - iButtonW - iAlign / 2 - iAlign * 2, iLineH, FALSE);
+    MoveWindow(hEncryptButton, w / 2 - iButtonW - iAlign / 2, h, iButtonW, iLineH, FALSE);
+    MoveWindow(hDecryptButton, w / 2 + iAlign / 2, h, iButtonW, iLineH, FALSE);
+    h += iLineH + iAlign;
 
     MoveWindow(hWnd, 0, 0, w, h, FALSE);
 }

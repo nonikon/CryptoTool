@@ -17,7 +17,7 @@
 #define WND_TITLE           _T("CryptoTool ") VERSION_STRING
 #define WND_FONTNAME        _T("Calibri Light")
 #define WND_FONTSIZE        (18)
-#define WND_ALIGN           (6)
+#define WND_ALIGN           (4)
 #define WND_LINEH           (WND_FONTSIZE + 6)
 #define WND_COMBOXW         (90)
 #define WND_BUTTONW         (80)
