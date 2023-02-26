@@ -189,13 +189,15 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
         switch (LOWORD(wParam)) {
         case IDC_ACC_EXIT:
             onWindowClose(hWnd);
-            return 0;
+            break;
         case IDC_ACC_DONE:
             onWindowDone(hWnd);
-            return 0;
-        default:
-            return 0;
+            break;
+        case IDC_ACC_NEXT:
+            switchTabTo((TabCtrl_GetCurFocus(hMainTab) + 1) % ARRAYSIZE(hTabWnds));
+            break;
         }
+        return 0;
 
     case WM_CLOSE:
         onWindowClose(hWnd);
