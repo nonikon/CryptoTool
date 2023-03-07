@@ -262,7 +262,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCm
     wc.hbrBackground = (HBRUSH) COLOR_WINDOW;
     wc.lpszMenuName = NULL;
     wc.lpszClassName = WND_CLASSNAME;
-    wc.hIconSm = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_CRYPT_MAIN_SM));
+    wc.hIconSm = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_CRYPT_MAIN));
 
     RegisterClassEx(&wc);
 
