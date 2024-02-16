@@ -51,10 +51,10 @@ static HWND hDecryptButton;
 static HWND hCryptProgressBar;
 
 static CONST TCHAR* algorithmItems[] = {
-    _T("AES"), _T("ARIA"), _T("BLOWFISH"), _T("CAMELLIA"), _T("CAST"), _T("CHACHA"), _T("IDEA"), _T("RC2"), _T("RC4"), _T("SEED"), _T("SM4"),
+    _T("AES"), _T("ARIA"), _T("BLOWFISH"), _T("CAMELLIA"), _T("CAST5"), _T("CHACHA20"), _T("DES"), _T("DESEDE3"), _T("IDEA"), _T("RC2"), _T("RC4"), _T("SEED"), _T("SM4"),
 };
 enum {
-    ALG_AES, ALG_ARIA, ALG_BLOWFISH, ALG_CAMELLIA, ALG_CAST, ALG_CHACHA, ALG_IDEA, ALG_RC2, ALG_RC4, ALG_SEED, ALG_SM4,
+    ALG_AES, ALG_ARIA, ALG_BLOWFISH, ALG_CAMELLIA, ALG_CAST5, ALG_CHACHA20, ALG_DES, ALG_DESEDE3, ALG_IDEA, ALG_RC2, ALG_RC4, ALG_SEED, ALG_SM4,
 };
 static CONST TCHAR* modeItems[] = {
     _T("ECB"), _T("CBC"), _T("CFB"), _T("OFB"), _T("CTR"),
@@ -108,7 +108,7 @@ static void onDropFiles(HWND hWnd, HDROP hDrop)
 static BOOL isModeNeeded(INT alg)
 {
     switch (alg) {
-    case ALG_CHACHA:
+    case ALG_CHACHA20:
     case ALG_RC4:
         return FALSE;
     default:
@@ -118,7 +118,7 @@ static BOOL isModeNeeded(INT alg)
 static BOOL isPaddingNeeded(INT alg, INT mode)
 {
     switch (alg) {
-    case ALG_CHACHA:
+    case ALG_CHACHA20:
     case ALG_RC4:
         return FALSE;
     default:
@@ -135,7 +135,7 @@ static BOOL isPaddingNeeded(INT alg, INT mode)
 static BOOL isIVNeeded(INT alg, INT mode)
 {
     switch (alg) {
-    case ALG_CHACHA:
+    case ALG_CHACHA20:
         return TRUE;
     case ALG_RC4:
         return FALSE;
@@ -374,11 +374,17 @@ static void doCrypt(HWND hWnd, BOOL isDec)
     case ALG_CAMELLIA:
         __SELECT_CIPHER_BY_KEYL(camellia)
         break;
-    case ALG_CAST:
+    case ALG_CAST5:
         __SELECT_CIPHER_BY_MODE_NOCTR(cast5, CAST5)
         break;
-    case ALG_CHACHA:
+    case ALG_CHACHA20:
         ciph = EVP_chacha20();
+        break;
+    case ALG_DES: // DES with 8 bytes key length
+        __SELECT_CIPHER_BY_MODE_NOCTR(des, DES);
+        break;
+    case ALG_DESEDE3: // DESede (Triple-DES) with triple (3*8 bytes) key length
+        __SELECT_CIPHER_BY_MODE_NOCTR(des_ede3, DESEDE3);
         break;
     case ALG_IDEA:
         __SELECT_CIPHER_BY_MODE_NOCTR(idea, IDEA)

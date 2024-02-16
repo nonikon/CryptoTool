@@ -73,7 +73,6 @@ cleanup:
     free(out);
     free(outs);
     free(outbytes);
-#undef __CONVERT_INPUT
 }
 
 static void resizeWindows(HWND hWnd)
