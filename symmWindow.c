@@ -51,10 +51,12 @@ static HWND hDecryptButton;
 static HWND hCryptProgressBar;
 
 static CONST TCHAR* algorithmItems[] = {
-    _T("AES"), _T("ARIA"), _T("BLOWFISH"), _T("CAMELLIA"), _T("CAST5"), _T("CHACHA20"), _T("DES"), _T("DESEDE3"), _T("IDEA"), _T("RC2"), _T("RC4"), _T("SEED"), _T("SM4"),
+    _T("AES"), _T("ARIA"), _T("BLOWFISH"), _T("CAMELLIA"), _T("CAST5"), _T("CHACHA20"), _T("DES"), _T("DESEDE3"),
+    _T("IDEA"), _T("RC2"), _T("RC4"), _T("RC5"), _T("SEED"), _T("SM4"),
 };
 enum {
-    ALG_AES, ALG_ARIA, ALG_BLOWFISH, ALG_CAMELLIA, ALG_CAST5, ALG_CHACHA20, ALG_DES, ALG_DESEDE3, ALG_IDEA, ALG_RC2, ALG_RC4, ALG_SEED, ALG_SM4,
+    ALG_AES, ALG_ARIA, ALG_BLOWFISH, ALG_CAMELLIA, ALG_CAST5, ALG_CHACHA20, ALG_DES, ALG_DESEDE3,
+    ALG_IDEA, ALG_RC2, ALG_RC4, ALG_RC5, ALG_SEED, ALG_SM4,
 };
 static CONST TCHAR* modeItems[] = {
     _T("ECB"), _T("CBC"), _T("CFB"), _T("OFB"), _T("CTR"),
@@ -404,6 +406,9 @@ static void doCrypt(HWND hWnd, BOOL isDec)
             goto cleanup;
         }
         ivl = 0; /* ignore input IV */
+        break;
+    case ALG_RC5: // rc5_32_12_16: 32 bits word size, 12 rounds, 16 bytes key length. And 64 bits block size
+        __SELECT_CIPHER_BY_MODE_NOCTR(rc5_32_12_16, RC5);
         break;
     case ALG_SEED:
         __SELECT_CIPHER_BY_MODE_NOCTR(seed, SEED)
