@@ -336,14 +336,17 @@ static void doCrypt(HWND hWnd, BOOL isDec)
             goto cleanup; \
         }
 
-#define __CONVERT_INPUT(func, notify) \
-        if (TrimSpace(in)) \
-            SetWindowText(hInputEditBox, in); \
+#define __CONVERT_INPUT_NOTRIM(func, notify) \
         inl = func(in); \
         if (inl <= 0) { \
             WARN(notify); \
             goto cleanup; \
         }
+
+#define __CONVERT_INPUT(func, notify) \
+        if (TrimSpace(in)) \
+            SetWindowText(hInputEditBox, in); \
+        __CONVERT_INPUT_NOTRIM(func, notify)
 
     if (TrimSpace(key))
         SetWindowText(hKeyEditBox, key);
@@ -453,7 +456,7 @@ static void doCrypt(HWND hWnd, BOOL isDec)
         __CONVERT_INPUT(CStringCharsToBinary, _T("INPUT is not a C-STRING string"));
         break;
     case IFMT_TEXT:
-        __CONVERT_INPUT(TextCharsToBinary, _T("INPUT is not a TEXT string"));
+        __CONVERT_INPUT_NOTRIM(TextCharsToBinary, _T("INPUT is not a TEXT string"));
         break;
     case IFMT_FILE:
         if (outfmt != OFMT_FILE) {
@@ -570,6 +573,7 @@ cleanup:
     free(outs);
     EVP_CIPHER_CTX_free(ctx);
 #undef __CONVERT_INPUT
+#undef __CONVERT_INPUT_NOTRIM
 #undef __SELECT_CIPHER_BY_KEYL
 #undef __SELECT_CIPHER_BY_MODE_NOCTR
 #undef __SELECT_CIPHER_BY_MODE
@@ -628,7 +632,7 @@ static void resizeWindows(HWND hWnd)
     MoveWindow(hInputEditBox, iAlign, h, w - iAlign * 2, iLineH * 6, FALSE);
     h += iLineH * 6 + iAlign;
 
-    MoveWindow(hOutputStaticText, iAlign, h, w / 2 - iAlign, iLineH, FALSE);
+    MoveWindow(hOutputStaticText, iAlign, h, w - iAlign * 2, iLineH, FALSE);
     h += iLineH;
     MoveWindow(hOutputEditBox, iAlign, h, w - iAlign * 2, iLineH * 6, FALSE);
     h += iLineH * 6 + iAlign;

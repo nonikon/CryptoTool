@@ -260,14 +260,17 @@ static void onDigestClicked(HWND hWnd)
     INT inl;
     INT outl;
 
-#define __CONVERT_INPUT(func, notify) \
-        if (TrimSpace(in)) \
-            SetWindowText(hInputEditBox, in); \
+#define __CONVERT_INPUT_NOTRIM(func, notify) \
         inl = func(in); \
         if (inl <= 0) { \
             WARN(notify); \
             goto cleanup; \
         }
+
+#define __CONVERT_INPUT(func, notify) \
+        if (TrimSpace(in)) \
+            SetWindowText(hInputEditBox, in); \
+        __CONVERT_INPUT_NOTRIM(func, notify)
 
     if (key) {
         if (TrimSpace(key))
@@ -345,7 +348,7 @@ static void onDigestClicked(HWND hWnd)
         __CONVERT_INPUT(CStringCharsToBinary, _T("INPUT is not a C-STRING string"));
         break;
     case IFMT_TEXT:
-        __CONVERT_INPUT(TextCharsToBinary, _T("INPUT is not a TEXT string"));
+        __CONVERT_INPUT_NOTRIM(TextCharsToBinary, _T("INPUT is not a TEXT string"));
         break;
     case IFMT_FILE:
         /* start digest file int the thread. */
@@ -404,6 +407,7 @@ cleanup:
     free(in);
     free(out);
 #undef __CONVERT_INPUT
+#undef __CONVERT_INPUT_NOTRIM
 }
 
 static void resizeWindows(HWND hWnd)
