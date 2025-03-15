@@ -4,6 +4,7 @@
 #define WND_CLASSNAME       _T("ConvertWindowClass")
 
 #define WM_USER_CONVERT      (WM_USER + 1)
+#define WM_USER_SWAP         (WM_USER + 2)
 
 static HWND hInformatStaticText;
 static HWND hInformatComboBox;
@@ -14,18 +15,19 @@ static HWND hInputEditBox;
 static HWND hOutputStaticText;
 static HWND hOutputEditBox;
 static HWND hConvertButton;
+static HWND hSwapButton;
 
 static CONST TCHAR* informatItems[] = {
     _T("BASE64"), _T("C-ARRAY"), _T("C-STRING"), _T("FILE"), _T("HEX"), _T("TEXT"),
 };
 static CONST TCHAR* outformatItems[] = {
-    _T("BASE64"), _T("C-ARRAY"), _T("C-STRING"), _T("HEX"), _T("TEXT"),
+    _T("BASE64"), _T("C-ARRAY"), _T("C-STRING"), _T("FILE"), _T("HEX"), _T("TEXT"),
 };
 enum {
     IFMT_BASE64, IFMT_C_ARRAY, IFMT_C_STRING, IFMT_FILE, IFMT_HEX, IFMT_TEXT,
 };
 enum {
-    OFMT_BASE64, OFMT_C_ARRAY, OFMT_C_STRING, OFMT_HEX, OFMT_TEXT,
+    OFMT_BASE64, OFMT_C_ARRAY, OFMT_C_STRING, OFMT_FILE, OFMT_HEX, OFMT_TEXT,
 };
 
 
@@ -120,6 +122,17 @@ static void onConvertClicked(HWND hWnd)
     case OFMT_TEXT:
         outs = BinaryToTextChars(in, inl);
         break;
+    case OFMT_FILE: {
+        TCHAR* path = GetTextOnce(hOutputEditBox);
+        if (!IsFile(path) || CONFIRM(_T("OUTPUT file will be overwrite, continue?")) == IDOK) {
+            if (WriteFileOnce(path, in, inl))
+                INFO(_T("Write output to [%s] done"), TRIMPATH(path));
+            else
+                WARN(_T("Write output to [%s] failed"), TRIMPATH(path));
+        }
+        free(path);
+        goto cleanup;
+    }
     default:
         WARN(_T("Invalid OUT-FORMAT"));
         goto cleanup;
@@ -131,6 +144,22 @@ cleanup:
     free(outs);
 #undef __CONVERT_INPUT
 #undef __CONVERT_INPUT_NOTRIM
+}
+
+static void onSwapClicked(HWND hWnd)
+{
+    INT infmt = GETCBOPT(hInformatComboBox);
+    INT outfmt = GETCBOPT(hOutformatComboBox);
+    VOID* in = GetTextOnce(hInputEditBox);
+    VOID* out = GetTextOnce(hOutputEditBox);
+
+	SETCBOPT(hInformatComboBox, outfmt);
+	SETCBOPT(hOutformatComboBox, infmt);
+    SetWindowText(hInputEditBox, out);
+    SetWindowText(hOutputEditBox, in);
+
+    free(in);
+    free(out);
 }
 
 static void resizeWindows(HWND hWnd)
@@ -161,7 +190,8 @@ static void resizeWindows(HWND hWnd)
     MoveWindow(hOutputEditBox, iAlign, h, w - iAlign * 2, iLineH * 8 + iAlign, FALSE);
     h += iLineH * 8 + iAlign + iAlign;
 
-    MoveWindow(hConvertButton, w / 2 - iButtonW / 2, h, iButtonW, iLineH, FALSE);
+    MoveWindow(hConvertButton, w / 2 - iButtonW - iAlign / 2, h, iButtonW, iLineH, FALSE);
+    MoveWindow(hSwapButton, w / 2 + iAlign / 2, h, iButtonW, iLineH, FALSE);
     h += iLineH + iAlign;
 
     MoveWindow(hWnd, 0, 0, w, h, FALSE);
@@ -191,6 +221,8 @@ static void onWindowCreate(HWND hWnd)
 
     hConvertButton = CreateWindow(_T("BUTTON"), _T("CONVERT"), WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
                                 0, 0, 0, 0, hWnd, (HMENU) WM_USER_CONVERT, hMainInstance, NULL);
+    hSwapButton = CreateWindow(_T("BUTTON"), _T("SWAP"), WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                                0, 0, 0, 0, hWnd, (HMENU) WM_USER_SWAP, hMainInstance, NULL);
 
     for (i = 0; i < ARRAYSIZE(informatItems); ++i)
         SendMessage(hInformatComboBox, CB_ADDSTRING, 0, (LPARAM) informatItems[i]);
@@ -222,6 +254,9 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
         case IDC_ACC_DONE:
         case WM_USER_CONVERT:
             onConvertClicked(hWnd);
+            break;
+        case WM_USER_SWAP:
+            onSwapClicked(hWnd);
             break;
         }
         return 0;
