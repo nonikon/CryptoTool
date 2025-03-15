@@ -28,13 +28,16 @@ extern HWND hMainWindow;
 HWND CreateSymmWindow(HWND hWnd);
 HWND CreateDigestWindow(HWND hWnd);
 HWND CreateRandomWindow(HWND hWnd);
+HWND CreateConvertWindow(HWND hWnd);
 
 BOOL OnSymmWindowClose();
 BOOL OnDigestWindowClose();
 BOOL OnRandomWindowClose();
+BOOL OnConvertWindowClose();
 
 VOID OnSymmConfigItem(CONST TCHAR* name, CONST TCHAR* value);
 VOID OnDigestConfigItem(CONST TCHAR* name, CONST TCHAR* value);
 VOID OnRandomConfigItem(CONST TCHAR* name, CONST TCHAR* value);
+VOID OnConvertConfigItem(CONST TCHAR* name, CONST TCHAR* value);
 
 #endif

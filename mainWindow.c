@@ -12,13 +12,13 @@ static HFONT hTitleFont;
 static HWND hMainTab;
 
 static HWND hTabWnds[] = {
-    NULL, NULL, NULL
+    NULL, NULL, NULL, NULL,
 };
 static CONST TCHAR* tabItems[] = {
-    _T("SYMM"), _T("DIGEST"), _T("RANDOM"),
+    _T("SYMM"), _T("DIGEST"), _T("RANDOM"), _T("CONVERT"),
 };
 enum {
-    TAB_SYMM, TAB_DGST, TAB_RANDOM,
+    TAB_SYMM, TAB_DGST, TAB_RANDOM, TAB_CONVERT,
 };
 
 static void resizeWindows(HWND hWnd)
@@ -93,6 +93,7 @@ static int onConfigItem(void* user, const char* section,
     static TCHAR symmSecName[32] = _T("SYMM");
     static TCHAR dgstSecName[32] = _T("DIGEST");
     static TCHAR randSecName[32] = _T("RANDOM");
+    static TCHAR convSecName[32] = _T("CONVERT");
     int i;
 
     if (!section[0]) {
@@ -115,6 +116,10 @@ static int onConfigItem(void* user, const char* section,
             if (value[0]) {
                 lstrcpyn(randSecName, value, sizeof(randSecName));
             }
+        } else if (!lstrcmp(name, _T("CONVCFG"))) {
+            if (value[0]) {
+                lstrcpyn(convSecName, value, sizeof(convSecName));
+            }
         }
     } else if (!lstrcmp(section, symmSecName)) {
         OnSymmConfigItem(name, value);
@@ -122,6 +127,8 @@ static int onConfigItem(void* user, const char* section,
         OnDigestConfigItem(name, value);
     } else if (!lstrcmp(section, randSecName)) {
         OnRandomConfigItem(name, value);
+    } else if (!lstrcmp(section, convSecName)) {
+        OnConvertConfigItem(name, value);
     }
 
     return 1;
@@ -147,6 +154,10 @@ static void onWindowCreate(HWND hWnd)
     hTabWnds[TAB_RANDOM] = CreateRandomWindow(hMainTab);
     tci.pszText = (PSTR) tabItems[TAB_RANDOM];
     SendMessage(hMainTab, TCM_INSERTITEM, (WPARAM) TAB_RANDOM, (LPARAM) &tci);
+
+    hTabWnds[TAB_CONVERT] = CreateConvertWindow(hMainTab);
+    tci.pszText = (PSTR) tabItems[TAB_CONVERT];
+    SendMessage(hMainTab, TCM_INSERTITEM, (WPARAM) TAB_CONVERT, (LPARAM) &tci);
 
     resizeWindows(hWnd);
     switchTabTo(TAB_SYMM);
@@ -184,7 +195,8 @@ static void onWindowClose(HWND hWnd)
 {
     if (!OnSymmWindowClose()
             && !OnDigestWindowClose()
-            && !OnRandomWindowClose()) {
+            && !OnRandomWindowClose()
+            && !OnConvertWindowClose()) {
         DestroyWindow(hWnd);
     }
 }
