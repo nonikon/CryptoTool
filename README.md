@@ -12,11 +12,11 @@ Or download the exeutable directly from the [Release](https://github.com/nonikon
 | --- | --- |
 | ESC | Exit |
 | CTRL+W | Exit |
-| CTRL+Z | Stop |
+| CTRL+T | Terminate background thread |
 | CTRL+ENTER | Start |
 | CTRL+TAB | Switch tab window |
 
-## Screenshot
+## Screenshots
 ![avatar](screenshot/1.png)
 ![avatar](screenshot/2.png)
 ![avatar](screenshot/3.png)
