@@ -19,7 +19,7 @@
 #define WND_FONTSIZE        (18)
 #define WND_ALIGN           (4)
 #define WND_LINEH           (WND_FONTSIZE + 6)
-#define WND_COMBOXW         (90)
+#define WND_COMBOXW         (96)
 #define WND_BUTTONW         (80)
 
 extern HINSTANCE hMainInstance;

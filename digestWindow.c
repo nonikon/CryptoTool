@@ -40,6 +40,8 @@ static HWND hInformatComboBox;
 static HWND hOutformatStaticText;
 static HWND hOutformatComboBox;
 static HWND hHMacCheckBox;
+static HWND hKeyformatStaticText;
+static HWND hKeyformatComboBox;
 static HWND hKeyStaticText;
 static HWND hKeyEditBox;
 static HWND hInputStaticText;
@@ -73,6 +75,12 @@ static CONST TCHAR* outformatItems[] = {
 enum {
     OFMT_BASE64, OFMT_C_ARRAY, OFMT_C_STRING, OFMT_HEX,
 };
+static CONST TCHAR* kvformatItems[] = {
+    _T("BASE64"), _T("C-ARRAY"), _T("C-STRING"), _T("HEX"),
+};
+enum {
+    KVFMT_BASE64, KVFMT_C_ARRAY, KVFMT_C_STRING, KVFMT_HEX,
+};
 
 
 static void onDropFiles(HWND hWnd, HDROP hDrop)
@@ -97,7 +105,10 @@ static void onDropFiles(HWND hWnd, HDROP hDrop)
 
 static void onHMacClicked(HWND hWnd)
 {
-    EnableWindow(hKeyEditBox, GETBTCHCK(hHMacCheckBox));
+    BOOL checked = GETBTCHCK(hHMacCheckBox);
+
+    EnableWindow(hKeyformatComboBox, checked);
+    EnableWindow(hKeyEditBox, checked);
 }
 
 static void onAlgorithmChanged(HWND hWnd)
@@ -253,6 +264,7 @@ static void onDigestClicked(HWND hWnd)
     INT bits = GETCBOPT(hBitsComboBox);
     INT infmt = GETCBOPT(hInformatComboBox);
     INT outfmt = GETCBOPT(hOutformatComboBox);
+    INT keyfmt = GETCBOPT(hKeyformatComboBox);
     VOID* key = GETBTCHCK(hHMacCheckBox) ? GetTextOnce(hKeyEditBox) : NULL;
     VOID* in = GetTextOnce(hInputEditBox);
     VOID* out = NULL;
@@ -272,12 +284,31 @@ static void onDigestClicked(HWND hWnd)
             SetWindowText(hInputEditBox, in); \
         __CONVERT_INPUT_NOTRIM(func, notify)
 
+#define __CONVERT_KEY(func, notify) \
+        if (TrimSpace(key)) \
+            SetWindowText(hKeyEditBox, key); \
+        keyl = func(key); \
+        if (keyl <= 0) { \
+            WARN(notify); \
+            goto cleanup; \
+        }
+
     if (key) {
-        if (TrimSpace(key))
-            SetWindowText(hKeyEditBox, key);
-        keyl = HexCharsToBinary(key);
-        if (keyl < 0) {
-            WARN(_T("KEY is not a HEX string"));
+        switch (keyfmt) {
+        case KVFMT_HEX:
+            __CONVERT_KEY(HexCharsToBinary, _T("KEY is not a HEX string"))
+            break;
+        case KVFMT_BASE64:
+            __CONVERT_KEY(Base64CharsToBinary, _T("KEY is not a BASE64 string"))
+            break;
+        case IFMT_C_ARRAY:
+            __CONVERT_KEY(CArrayCharsToBinary, _T("KEY is not a C-ARRAY string"));
+            break;
+        case IFMT_C_STRING:
+            __CONVERT_KEY(CStringCharsToBinary, _T("KEY is not a C-STRING string"));
+            break;
+        default:
+            WARN(_T("Invalid KEY-FORMAT"));
             goto cleanup;
         }
     }
@@ -406,6 +437,7 @@ cleanup:
     free(key);
     free(in);
     free(out);
+#undef __CONVERT_KEY
 #undef __CONVERT_INPUT
 #undef __CONVERT_INPUT_NOTRIM
 }
@@ -437,9 +469,11 @@ static void resizeWindows(HWND hWnd)
 
     h += iLineH + iLineH + iAlign;
 
-    MoveWindow(hKeyStaticText, iAlign, h, w - iAlign * 2, iLineH, FALSE);
+    MoveWindow(hKeyformatStaticText, iAlign, h, iComboxW, iLineH, FALSE);
+    MoveWindow(hKeyStaticText, iComboxW + iAlign * 2, h, w - iComboxW - iAlign * 3, iLineH, FALSE);
     h += iLineH;
-    MoveWindow(hKeyEditBox, iAlign, h, w - iAlign * 2, iLineH, FALSE);
+    MoveWindow(hKeyformatComboBox, iAlign, h, iComboxW, iLineH, FALSE);
+    MoveWindow(hKeyEditBox, iComboxW + iAlign * 2, h, w - iComboxW - iAlign * 3, iLineH, FALSE);
     h += iLineH + iAlign;
 
     MoveWindow(hInputStaticText, iAlign, h, w - iAlign * 2, iLineH, FALSE);
@@ -482,9 +516,13 @@ static void onWindowCreate(HWND hWnd)
     hHMacCheckBox = CreateWindow(_T("BUTTON"), _T("HMAC"), WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
                                 0, 0, 0, 0, hWnd, (HMENU) WM_USER_HMAC, hMainInstance, NULL);
 
-    hKeyStaticText = CreateWindow(_T("STATIC"), _T("KEY <HEX>"), WS_CHILD | WS_VISIBLE | SS_LEFT,
+    hKeyformatStaticText = CreateWindow(_T("STATIC"), _T("KEY-FORMAT"), WS_CHILD | WS_VISIBLE | SS_LEFT,
+                                0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
+    hKeyformatComboBox = CreateWindow(_T("COMBOBOX"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | CBS_DROPDOWNLIST,
+                                0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
+    hKeyStaticText = CreateWindow(_T("STATIC"), _T("KEY"), WS_CHILD | WS_VISIBLE | SS_LEFT,
                                 0, 0, 0, 0, hWnd, NULL, NULL, NULL);
-    hKeyEditBox = CreateWindow(_T("EDIT"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | ES_AUTOHSCROLL,
+    hKeyEditBox = CreateWindow(_T("EDIT"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | ES_AUTOVSCROLL | ES_MULTILINE,
                                 0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
 
     hInputStaticText = CreateWindow(_T("STATIC"), _T("INPUT"), WS_CHILD | WS_VISIBLE | SS_LEFT,
@@ -515,6 +553,9 @@ static void onWindowCreate(HWND hWnd)
     for (i = 0; i < ARRAYSIZE(outformatItems); ++i)
         SendMessage(hOutformatComboBox, CB_ADDSTRING, 0, (LPARAM) outformatItems[i]);
 	SETCBOPT(hOutformatComboBox, OFMT_HEX);
+    for (i = 0; i < ARRAYSIZE(kvformatItems); ++i)
+        SendMessage(hKeyformatComboBox, CB_ADDSTRING, 0, (LPARAM) kvformatItems[i]);
+	SETCBOPT(hKeyformatComboBox, KVFMT_HEX);
 
     SendMessage(hInputEditBox, EM_SETLIMITTEXT, (WPARAM) (MAX_INFILE_SIZE * 5), 0);
     // SendMessage(hOutputEditBox, EM_SETLIMITTEXT, (WPARAM) (MAX_INFILE_SIZE * 5), 0);
@@ -592,6 +633,8 @@ VOID OnDigestConfigItem(CONST TCHAR* name, CONST TCHAR* value)
         __SELECT_OPTION(informatItems, hInformatComboBox);
     } else if (!lstrcmp(name, _T("OUT-FORMAT"))) {
         __SELECT_OPTION(outformatItems, hOutformatComboBox);
+    } else if (!lstrcmp(name, _T("KEY-FORMAT"))) {
+        __SELECT_OPTION(kvformatItems, hKeyformatComboBox);
     } else if (!lstrcmp(name, _T("KEY"))) {
         SetWindowText(hKeyEditBox, value);
     } else if (!lstrcmp(name, _T("INPUT"))) {
