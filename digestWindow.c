@@ -22,9 +22,11 @@ typedef struct stDigestThreadParams {
     INT keyl;
     INT outfmt;
     /* OUT */
-    INT resultl;
-    TCHAR result[EVP_MAX_MD_SIZE];
+    LARGE_INTEGER inLen;
+    INT outLen;
+    TCHAR out[EVP_MAX_MD_SIZE];
     TCHAR errorMsg[256];
+    DWORD time;
 } DigestThreadParams;
 
 static HANDLE hDigestThread;
@@ -166,9 +168,9 @@ static DWORD doDigestFile(VOID* arg)
     DWORD beginTickCnt;
     DWORD endTickCnt;
     LARGE_INTEGER current;
-    LARGE_INTEGER total;
 
-    params->resultl = 0;
+    params->inLen.QuadPart = 0;
+    params->outLen = 0;
     beginTickCnt = GetTickCount();
     if (ishmac) {
         ctx.hmac = HMAC_CTX_new();
@@ -184,7 +186,7 @@ static DWORD doDigestFile(VOID* arg)
         wsprintf(params->errorMsg, _T("open INPUT file [%s] failed"), TRIMPATH(params->inPath));
         goto done;
     }
-    if (!GetFileSizeEx(hIn, &total)) {
+    if (!GetFileSizeEx(hIn, &params->inLen)) {
         wsprintf(params->errorMsg, _T("get INPUT file size [%s] failed"), TRIMPATH(params->inPath));
         goto done;
     }
@@ -200,8 +202,8 @@ static DWORD doDigestFile(VOID* arg)
         ReadFile(hIn, rBuf, FILE_RBUF_SIZE, &nRead, NULL);
 
         if (!nRead) {
-            if (!(ishmac ? HMAC_Final(ctx.hmac, params->result, &params->resultl)
-                         : EVP_DigestFinal(ctx.md, params->result, &params->resultl))) {
+            if (!(ishmac ? HMAC_Final(ctx.hmac, params->out, &params->outLen)
+                         : EVP_DigestFinal(ctx.md, params->out, &params->outLen))) {
                 wsprintf(params->errorMsg, _T("EVP_DigestFinal/HMAC_Final failed, code 0x%08X"), ERR_get_error());
                 goto done;
             }
@@ -215,7 +217,7 @@ static DWORD doDigestFile(VOID* arg)
             goto done;
         }
 
-        tempPercent = (current.QuadPart * 100 / total.QuadPart) & 0xFFFFFFFF;
+        tempPercent = (current.QuadPart * 100 / params->inLen.QuadPart) & 0xFFFFFFFF;
         if (progressPercent != tempPercent) {
             PostMessage(hDigestProgressBar, PBM_SETPOS, (WPARAM) tempPercent, 0);
             progressPercent = tempPercent;
@@ -223,9 +225,7 @@ static DWORD doDigestFile(VOID* arg)
     }
 
     endTickCnt = GetTickCount();
-
-    wsprintf(params->errorMsg, _T("digest done, time %u.%us"),
-        (endTickCnt - beginTickCnt) / 1000, (endTickCnt - beginTickCnt) % 1000);
+    params->time = endTickCnt - beginTickCnt;
 done:
     CloseHandle(hIn);
     free(rBuf);
@@ -241,15 +241,17 @@ static void onDigestThreadDone(HWND hWnd, DigestThreadParams* params)
     WaitForSingleObject(hDigestThread, INFINITE);
     CloseHandle(hDigestThread);
 
-    ShowWindow(hDigestProgressBar, SW_HIDE);
-    SendMessage(hDigestProgressBar, PBM_SETPOS, 0, 0);
-
-    if (params->resultl) {
-        INFO(params->errorMsg);
-        showDigestResult(params->result, params->resultl, params->outfmt);
+    if (params->outLen) {
+        FormatTextTo(hInputStaticText, _T("INPUT %ld"), params->inLen.QuadPart);
+        FormatTextTo(hOutputStaticText, _T("OUTPUT %d (%u.%us)"), params->outLen,
+            params->time / 1000, params->time % 1000);
+        showDigestResult(params->out, params->outLen, params->outfmt);
     } else {
         WARN(params->errorMsg);
     }
+
+    ShowWindow(hDigestProgressBar, SW_HIDE);
+    SendMessage(hDigestProgressBar, PBM_SETPOS, 0, 0);
 
     free(params->inPath);
     free(params->outPath);
@@ -481,7 +483,7 @@ static void resizeWindows(HWND hWnd)
     MoveWindow(hInputEditBox, iAlign, h, w - iAlign * 2, iLineH * 8, FALSE);
     h += iLineH * 8 + iAlign;
 
-    MoveWindow(hOutputStaticText, iAlign, h, w / 2 - iAlign, iLineH, FALSE);
+    MoveWindow(hOutputStaticText, iAlign, h, w - iAlign * 2, iLineH, FALSE);
     h += iLineH;
     MoveWindow(hOutputEditBox, iAlign, h, w - iAlign * 2, iLineH * 6 + iAlign, FALSE);
     h += iLineH * 6 + iAlign * 2;

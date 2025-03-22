@@ -126,7 +126,7 @@ static void onConvertClicked(HWND hWnd)
         TCHAR* path = GetTextOnce(hOutputEditBox);
         if (!IsFile(path) || CONFIRM(_T("OUTPUT file will be overwrite, continue?")) == IDOK) {
             if (WriteFileOnce(path, in, inl))
-                INFO(_T("Write output to [%s] done"), TRIMPATH(path));
+                FormatTextTo(hOutputStaticText, _T("OUTPUT %d (File)"), inl);
             else
                 WARN(_T("Write output to [%s] failed"), TRIMPATH(path));
         }
@@ -181,11 +181,11 @@ static void resizeWindows(HWND hWnd)
 
     h += iLineH + iLineH + iAlign;
 
-    MoveWindow(hInputStaticText, iAlign, h, w / 2 - iAlign, iLineH, FALSE);
+    MoveWindow(hInputStaticText, iAlign, h, w - iAlign * 2, iLineH, FALSE);
     h += iLineH;
     MoveWindow(hInputEditBox, iAlign, h, w - iAlign * 2, iLineH * 8 + iAlign, FALSE);
     h += iLineH * 8 + iAlign + iAlign;
-    MoveWindow(hOutputStaticText, iAlign, h, w / 2 - iAlign, iLineH, FALSE);
+    MoveWindow(hOutputStaticText, iAlign, h, w - iAlign * 2, iLineH, FALSE);
     h += iLineH;
     MoveWindow(hOutputEditBox, iAlign, h, w - iAlign * 2, iLineH * 8 + iAlign, FALSE);
     h += iLineH * 8 + iAlign + iAlign;

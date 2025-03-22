@@ -22,6 +22,9 @@ typedef struct stCryptThreadParams {
     /* OUT */
     BOOL isSucc;
     TCHAR errorMsg[256];
+    LARGE_INTEGER inLen;
+    LARGE_INTEGER outLen;
+    DWORD time;
 } CryptThreadParams;
 
 static HANDLE hCryptThread;
@@ -187,10 +190,11 @@ static DWORD doCryptFile(VOID* arg)
     DWORD beginTickCnt;
     DWORD endTickCnt;
     LARGE_INTEGER current;
-    LARGE_INTEGER total;
     int outl;
 
     params->isSucc = FALSE;
+    params->inLen.QuadPart = 0;
+    params->outLen.QuadPart = 0;
     beginTickCnt = GetTickCount();
 
     hIn = CreateFile(params->inPath, GENERIC_READ, FILE_SHARE_READ, NULL,
@@ -199,11 +203,11 @@ static DWORD doCryptFile(VOID* arg)
         wsprintf(params->errorMsg, _T("open INPUT file [%s] failed"), TRIMPATH(params->inPath));
         goto done;
     }
-    if (!GetFileSizeEx(hIn, &total)) {
+    if (!GetFileSizeEx(hIn, &params->inLen)) {
         wsprintf(params->errorMsg, _T("get INPUT file size [%s] failed"), TRIMPATH(params->inPath));
         goto done;
     }
-    if (params->needChkSize && total.QuadPart % EVP_CIPHER_CTX_block_size(params->ciphCtx) != 0) {
+    if (params->needChkSize && params->inLen.QuadPart % EVP_CIPHER_CTX_block_size(params->ciphCtx) != 0) {
         wsprintf(params->errorMsg, _T("INPUT file size is not a multiple of %d"),
             EVP_CIPHER_CTX_block_size(params->ciphCtx));
         goto done;
@@ -236,6 +240,7 @@ static DWORD doCryptFile(VOID* arg)
                 wsprintf(params->errorMsg, _T("write to [%s] failed"), TRIMPATH(params->outPath));
                 goto done;
             }
+            params->outLen.QuadPart += outl;
             break;
         }
         current.QuadPart += nReadWrite;
@@ -248,19 +253,18 @@ static DWORD doCryptFile(VOID* arg)
             wsprintf(params->errorMsg, _T("write to [%s] failed"), TRIMPATH(params->outPath));
             goto done;
         }
+        params->outLen.QuadPart += outl;
 
-        tempPercent = (current.QuadPart * 100 / total.QuadPart) & 0xFFFFFFFF;
+        tempPercent = (current.QuadPart * 100 / params->inLen.QuadPart) & 0xFFFFFFFF;
         if (progressPercent != tempPercent) {
             PostMessage(hCryptProgressBar, PBM_SETPOS, (WPARAM) tempPercent, 0);
             progressPercent = tempPercent;
         }
     }
 
-    params->isSucc = TRUE;
     endTickCnt = GetTickCount();
-
-    wsprintf(params->errorMsg, _T("crypt done, time %u.%us"),
-        (endTickCnt - beginTickCnt) / 1000, (endTickCnt - beginTickCnt) % 1000);
+    params->isSucc = TRUE;
+    params->time = endTickCnt - beginTickCnt;
 done:
     CloseHandle(hIn);
     CloseHandle(hOut);
@@ -274,13 +278,16 @@ static void onCryptThreadDone(HWND hWnd, CryptThreadParams* params)
     WaitForSingleObject(hCryptThread, INFINITE);
     CloseHandle(hCryptThread);
 
+    if (params->isSucc) {
+        FormatTextTo(hInputStaticText, _T("INPUT %ld"), params->inLen.QuadPart);
+        FormatTextTo(hOutputStaticText, _T("OUTPUT %ld (%u.%us)"), params->outLen.QuadPart,
+            params->time / 1000, params->time % 1000);
+    } else {
+        WARN(params->errorMsg);
+    }
+
     ShowWindow(hCryptProgressBar, SW_HIDE);
     SendMessage(hCryptProgressBar, PBM_SETPOS, 0, 0);
-
-    if (params->isSucc)
-        INFO(params->errorMsg);
-    else
-        WARN(params->errorMsg);
 
     free(params->inPath);
     free(params->outPath);
@@ -612,8 +619,8 @@ static void doCrypt(HWND hWnd, BOOL isDec)
         outs = GetTextOnce(hOutputEditBox);
         if (IsFile(outs) && CONFIRM(_T("OUTPUT file will be overwrite, continue?")) != IDOK)
             goto cleanup;
-        if (WriteFileOnce(outs, out, outl))
-            INFO(_T("Write output to [%s] done"), TRIMPATH(outs));
+        if (!WriteFileOnce(outs, out, outl))
+            FormatTextTo(hOutputStaticText, _T("OUTPUT %d (File)"), outl);
         else
             WARN(_T("Write output to [%s] failed"), TRIMPATH(outs));
         break;
