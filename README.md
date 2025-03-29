@@ -13,7 +13,8 @@ Or download the exeutable directly from the [Release](https://github.com/nonikon
 | ESC | Exit |
 | CTRL+W | Exit |
 | CTRL+T | Terminate background thread |
-| CTRL+ENTER | Start |
+| CTRL+D | Start (Done) |
+| CTRL+ENTER | Start (Done) |
 | CTRL+TAB | Switch tab window |
 
 ## Screenshots
