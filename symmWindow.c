@@ -375,7 +375,7 @@ static void doCrypt(HWND hWnd, BOOL isDec)
         if (TrimSpace(key)) \
             SetWindowText(hKeyEditBox, key); \
         keyl = func(key); \
-        if (keyl <= 0) { \
+        if (keyl < 0) { \
             WARN(notify); \
             goto cleanup; \
         }
@@ -384,7 +384,7 @@ static void doCrypt(HWND hWnd, BOOL isDec)
         if (TrimSpace(iv)) \
             SetWindowText(hIVEditBox, iv); \
         ivl = func(iv); \
-        if (ivl <= 0) { \
+        if (ivl < 0) { \
             WARN(notify); \
             goto cleanup; \
         }

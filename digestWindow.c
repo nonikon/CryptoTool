@@ -290,7 +290,7 @@ static void onDigestClicked(HWND hWnd)
         if (TrimSpace(key)) \
             SetWindowText(hKeyEditBox, key); \
         keyl = func(key); \
-        if (keyl <= 0) { \
+        if (keyl < 0) { \
             WARN(notify); \
             goto cleanup; \
         }
