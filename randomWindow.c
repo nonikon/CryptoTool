@@ -167,6 +167,19 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
     }
 }
 
+VOID OnRandomConfigSave(FILE* fp)
+{
+    TCHAR* outbytes = GetTextOnce(hOutbytesEditBox);
+
+    TrimSpace(outbytes);
+
+    /* note: OUTPUT not included */
+    _ftprintf(fp, _T("OUT-FORMAT=%s\r\nOUT-BYTES=%s\r\n"),
+        outformatItems[GETCBOPT(hOutformatComboBox)], outbytes);
+
+    free(outbytes);
+}
+
 VOID OnRandomConfigItem(CONST TCHAR* name, CONST TCHAR* value)
 {
     UINT i;

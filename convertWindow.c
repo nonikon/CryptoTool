@@ -275,6 +275,20 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
     }
 }
 
+VOID OnConvertConfigSave(FILE* fp)
+{
+    TCHAR* input = GetTextOnce(hInputEditBox);
+
+    TrimSpace(input);
+
+    /* note: OUTPUT not included */
+    _ftprintf(fp, _T("IN-FORMAT=%s\r\nOUT-FORMAT=%s\r\nINPUT=%s\r\n"),
+        informatItems[GETCBOPT(hInformatComboBox)],
+        outformatItems[GETCBOPT(hOutformatComboBox)], input);
+
+    free(input);
+}
+
 VOID OnConvertConfigItem(CONST TCHAR* name, CONST TCHAR* value)
 {
     UINT i;

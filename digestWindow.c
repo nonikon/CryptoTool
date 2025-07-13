@@ -614,6 +614,28 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
     }
 }
 
+VOID OnDigestConfigSave(FILE* fp)
+{
+    TCHAR* key = GetTextOnce(hKeyEditBox);
+    TCHAR* input = GetTextOnce(hInputEditBox);
+
+    TrimSpace(key);
+    TrimSpace(input);
+
+    /* note: OUTPUT not included */
+    _ftprintf(fp, _T("ALGORITHM=%s\r\nBITS=%s\r\nIN-FORMAT=%s\r\nOUT-FORMAT=%s\r\n")
+        _T("KEY-FORMAT=%s\r\nHMAC=%s\r\nKEY=%s\r\nINPUT=%s\r\n"),
+        algorithmItems[GETCBOPT(hAlgorithmComboBox)],
+        bitsItems[GETCBOPT(hBitsComboBox)],
+        informatItems[GETCBOPT(hInformatComboBox)],
+        outformatItems[GETCBOPT(hOutformatComboBox)],
+        kvformatItems[GETCBOPT(hKeyformatComboBox)],
+        GETBTCHCK(hHMacCheckBox) ? "ON" : "OFF", key, input);
+
+    free(key);
+    free(input);
+}
+
 VOID OnDigestConfigItem(CONST TCHAR* name, CONST TCHAR* value)
 {
     UINT i;
@@ -627,7 +649,7 @@ VOID OnDigestConfigItem(CONST TCHAR* name, CONST TCHAR* value)
             } \
         }
 
-    if (!lstrcmp(name, _T("ALGRITHM"))) {
+    if (!lstrcmp(name, _T("ALGORITHM"))) {
         __SELECT_OPTION_EX(algorithmItems, hAlgorithmComboBox, onAlgorithmChanged(NULL));
     } else if (!lstrcmp(name, _T("BITS"))) {
         __SELECT_OPTION(bitsItems, hBitsComboBox);

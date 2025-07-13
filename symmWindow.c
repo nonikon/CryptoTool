@@ -854,6 +854,32 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
     }
 }
 
+VOID OnSymmConfigSave(FILE* fp)
+{
+    TCHAR* key = GetTextOnce(hKeyEditBox);
+    TCHAR* iv = GetTextOnce(hIVEditBox);
+    TCHAR* input = GetTextOnce(hInputEditBox);
+
+    TrimSpace(key);
+    TrimSpace(iv);
+    TrimSpace(input);
+
+    /* note: OUTPUT not included */
+    _ftprintf(fp, _T("ALGORITHM=%s\r\nMODE=%s\r\nPADDING=%s\r\nIN-FORMAT=%s\r\nOUT-FORMAT=%s\r\n")
+        _T("KEY-FORMAT=%s\r\nIV-FORMAT=%s\r\nKEY=%s\r\nIV=%s\r\nINPUT=%s\r\n"),
+        algorithmItems[GETCBOPT(hAlgorithmComboBox)],
+        modeItems[GETCBOPT(hModeComboBox)],
+        paddingItems[GETCBOPT(hPaddingComboBox)],
+        informatItems[GETCBOPT(hInformatComboBox)],
+        outformatItems[GETCBOPT(hOutformatComboBox)],
+        kvformatItems[GETCBOPT(hKeyformatComboBox)],
+        kvformatItems[GETCBOPT(hIVformatComboBox)], key, iv, input);
+
+    free(key);
+    free(iv);
+    free(input);
+}
+
 VOID OnSymmConfigItem(CONST TCHAR* name, CONST TCHAR* value)
 {
     UINT i;
@@ -867,7 +893,7 @@ VOID OnSymmConfigItem(CONST TCHAR* name, CONST TCHAR* value)
             } \
         }
 
-    if (!lstrcmp(name, _T("ALGRITHM"))) {
+    if (!lstrcmp(name, _T("ALGORITHM"))) {
         __SELECT_OPTION(algorithmItems, hAlgorithmComboBox);
     } else if (!lstrcmp(name, _T("MODE"))) {
         __SELECT_OPTION_EX(modeItems, hModeComboBox, onAlgorithmOrModeChanged(NULL));

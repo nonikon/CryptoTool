@@ -87,47 +87,42 @@ static void switchTabTo(INT idx)
     ShowWindow(hTabWnds[idx], SW_SHOW);
 }
 
+static void saveConfigs()
+{
+    FILE* fp = _tfopen(CONFIG_FILENAME, "wb");
+    if (fp) {
+        _ftprintf(fp, "INITTAB=%s\r\n", tabItems[TabCtrl_GetCurSel(hMainTab)]);
+        _ftprintf(fp, "\r\n[%s]\r\n", tabItems[TAB_SYMM]);
+        OnSymmConfigSave(fp);
+        _ftprintf(fp, "\r\n[%s]\r\n", tabItems[TAB_DGST]);
+        OnDigestConfigSave(fp);
+        _ftprintf(fp, "\r\n[%s]\r\n", tabItems[TAB_RANDOM]);
+        OnRandomConfigSave(fp);
+        _ftprintf(fp, "\r\n[%s]\r\n", tabItems[TAB_CONVERT]);
+        OnConvertConfigSave(fp);
+        fclose(fp);
+    }
+}
+
 static int onConfigItem(void* user, const char* section,
                 const char* name, const char* value)
 {
-    static TCHAR symmSecName[32] = _T("SYMM");
-    static TCHAR dgstSecName[32] = _T("DIGEST");
-    static TCHAR randSecName[32] = _T("RANDOM");
-    static TCHAR convSecName[32] = _T("CONVERT");
-    int i;
-
     if (!section[0]) {
         if (!lstrcmp(name, _T("INITTAB"))) {
-            for (i = 0; i < ARRAYSIZE(tabItems); ++i) {
+            for (int i = 0; i < ARRAYSIZE(tabItems); ++i) {
                 if (!lstrcmp(value, tabItems[i])) {
                     switchTabTo(i);
                     break;
                 }
             }
-        } else if (!lstrcmp(name, _T("SYMMCFG"))) {
-            if (value[0]) {
-                lstrcpyn(symmSecName, value, sizeof(symmSecName));
-            }
-        } else if (!lstrcmp(name, _T("DGSTCFG"))) {
-            if (value[0]) {
-                lstrcpyn(dgstSecName, value, sizeof(dgstSecName));
-            }
-        } else if (!lstrcmp(name, _T("RANDCFG"))) {
-            if (value[0]) {
-                lstrcpyn(randSecName, value, sizeof(randSecName));
-            }
-        } else if (!lstrcmp(name, _T("CONVCFG"))) {
-            if (value[0]) {
-                lstrcpyn(convSecName, value, sizeof(convSecName));
-            }
         }
-    } else if (!lstrcmp(section, symmSecName)) {
+    } else if (!lstrcmp(section, tabItems[TAB_SYMM])) {
         OnSymmConfigItem(name, value);
-    } else if (!lstrcmp(section, dgstSecName)) {
+    } else if (!lstrcmp(section, tabItems[TAB_DGST])) {
         OnDigestConfigItem(name, value);
-    } else if (!lstrcmp(section, randSecName)) {
+    } else if (!lstrcmp(section, tabItems[TAB_RANDOM])) {
         OnRandomConfigItem(name, value);
-    } else if (!lstrcmp(section, convSecName)) {
+    } else if (!lstrcmp(section, tabItems[TAB_CONVERT])) {
         OnConvertConfigItem(name, value);
     }
 
@@ -197,6 +192,7 @@ static void onWindowClose(HWND hWnd)
             && !OnDigestWindowClose()
             && !OnRandomWindowClose()
             && !OnConvertWindowClose()) {
+        saveConfigs();
         DestroyWindow(hWnd);
     }
 }
