@@ -200,11 +200,11 @@ static DWORD doCryptFile(VOID* arg)
     hIn = CreateFile(params->inPath, GENERIC_READ, FILE_SHARE_READ, NULL,
                     OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hIn == INVALID_HANDLE_VALUE) {
-        wsprintf(params->errorMsg, _T("open INPUT file [%s] failed"), TRIMPATH(params->inPath));
+        wsprintf(params->errorMsg, _T("Open INPUT file [%s] failed"), TRIMPATH(params->inPath));
         goto done;
     }
     if (!GetFileSizeEx(hIn, &params->inLen)) {
-        wsprintf(params->errorMsg, _T("get INPUT file size [%s] failed"), TRIMPATH(params->inPath));
+        wsprintf(params->errorMsg, _T("Get INPUT file size [%s] failed"), TRIMPATH(params->inPath));
         goto done;
     }
     if (params->needChkSize && params->inLen.QuadPart % EVP_CIPHER_CTX_block_size(params->ciphCtx) != 0) {
@@ -216,7 +216,7 @@ static DWORD doCryptFile(VOID* arg)
     hOut = CreateFile(params->outPath, GENERIC_WRITE, 0, NULL,
                     CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hOut == INVALID_HANDLE_VALUE) {
-        wsprintf(params->errorMsg, _T("open OUTPUT file [%s] failed"), TRIMPATH(params->outPath));
+        wsprintf(params->errorMsg, _T("Open OUTPUT file [%s] failed"), TRIMPATH(params->outPath));
         goto done;
     }
 
@@ -226,7 +226,7 @@ static DWORD doCryptFile(VOID* arg)
 
     while (1) {
         if (bCryptThreadCanceled) {
-            wsprintf(params->errorMsg, _T("crypt thread canceled"));
+            wsprintf(params->errorMsg, _T("Crypt thread canceled"));
             goto done;
         }
         ReadFile(hIn, rBuf, FILE_RBUF_SIZE, &nReadWrite, NULL);
@@ -237,7 +237,7 @@ static DWORD doCryptFile(VOID* arg)
                 goto done;
             }
             if (outl && !WriteFile(hOut, wBuf, outl, &nReadWrite, NULL)) {
-                wsprintf(params->errorMsg, _T("write to [%s] failed"), TRIMPATH(params->outPath));
+                wsprintf(params->errorMsg, _T("Write to [%s] failed"), TRIMPATH(params->outPath));
                 goto done;
             }
             params->outLen.QuadPart += outl;
@@ -250,7 +250,7 @@ static DWORD doCryptFile(VOID* arg)
             goto done;
         }
         if (!WriteFile(hOut, wBuf, outl, &nReadWrite, NULL)) {
-            wsprintf(params->errorMsg, _T("write to [%s] failed"), TRIMPATH(params->outPath));
+            wsprintf(params->errorMsg, _T("Write to [%s] failed"), TRIMPATH(params->outPath));
             goto done;
         }
         params->outLen.QuadPart += outl;
@@ -279,8 +279,8 @@ static void onCryptThreadDone(HWND hWnd, CryptThreadParams* params)
     CloseHandle(hCryptThread);
 
     if (params->isSucc) {
-        FormatTextTo(hInputStaticText, _T("INPUT %ld"), params->inLen.QuadPart);
-        FormatTextTo(hOutputStaticText, _T("OUTPUT %ld (%u.%us)"), params->outLen.QuadPart,
+        FormatTextTo(hInputStaticText, _T("INPUT %lld"), params->inLen.QuadPart);
+        FormatTextTo(hOutputStaticText, _T("OUTPUT %lld (%u.%us)"), params->outLen.QuadPart,
             params->time / 1000, params->time % 1000);
     } else {
         WARN(params->errorMsg);
@@ -396,10 +396,10 @@ static void doCrypt(HWND hWnd, BOOL isDec)
     case KVFMT_BASE64:
         __CONVERT_KEY(Base64CharsToBinary, _T("KEY is not a BASE64 string"))
         break;
-    case IFMT_C_ARRAY:
+    case KVFMT_C_ARRAY:
         __CONVERT_KEY(CArrayCharsToBinary, _T("KEY is not a C-ARRAY string"));
         break;
-    case IFMT_C_STRING:
+    case KVFMT_C_STRING:
         __CONVERT_KEY(CStringCharsToBinary, _T("KEY is not a C-STRING string"));
         break;
     default:
@@ -414,10 +414,10 @@ static void doCrypt(HWND hWnd, BOOL isDec)
     case KVFMT_BASE64:
         __CONVERT_IV(Base64CharsToBinary, _T("IV is not a BASE64 string"))
         break;
-    case IFMT_C_ARRAY:
+    case KVFMT_C_ARRAY:
         __CONVERT_IV(CArrayCharsToBinary, _T("IV is not a C-ARRAY string"));
         break;
-    case IFMT_C_STRING:
+    case KVFMT_C_STRING:
         __CONVERT_IV(CStringCharsToBinary, _T("IV is not a C-STRING string"));
         break;
     default:
@@ -528,7 +528,7 @@ static void doCrypt(HWND hWnd, BOOL isDec)
             inl = MAX_INFILE_SIZE;
             _in = ReadFileOnce(in, (UINT*) &inl);
             if (!_in) {
-                WARN(_T("file [%s] does not exist or > %uKB when OUT-FORMAT is not a FILE"),
+                WARN(_T("File [%s] does not exist or > %uKB when OUT-FORMAT is not a FILE"),
                     TRIMPATH(in), MAX_INFILE_SIZE / 1024);
                 goto cleanup;
             }
@@ -538,7 +538,7 @@ static void doCrypt(HWND hWnd, BOOL isDec)
         }
         /* outfmt == OFMT_FILE, start crypt file int the thread. */
         if (hCryptThread) {
-            WARN(_T("crypt thread already running"));
+            WARN(_T("Crypt thread already running"));
             goto cleanup;
         }
         outs = GetTextOnce(hOutputEditBox);
@@ -560,7 +560,7 @@ static void doCrypt(HWND hWnd, BOOL isDec)
         bCryptThreadCanceled = FALSE;
         hCryptThread = CreateThread(NULL, 0, doCryptFile, &cryptThreadParams, 0, NULL);
         if (!hCryptThread) {
-            WARN(_T("create crypt thread failed"));
+            WARN(_T("Create crypt thread failed"));
             goto cleanup;
         }
         free(key);
@@ -745,7 +745,7 @@ static void onWindowCreate(HWND hWnd)
     hKeyformatComboBox = CreateWindow(_T("COMBOBOX"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | CBS_DROPDOWNLIST,
                                 0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
     hKeyStaticText = CreateWindow(_T("STATIC"), _T("KEY"), WS_CHILD | WS_VISIBLE | SS_LEFT,
-                                0, 0, 0, 0, hWnd, NULL, NULL, NULL);
+                                0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
     hKeyEditBox = CreateWindow(_T("EDIT"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | ES_AUTOVSCROLL | ES_MULTILINE,
                                 0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
 
@@ -923,7 +923,7 @@ VOID OnSymmConfigItem(CONST TCHAR* name, CONST TCHAR* value)
 
 BOOL OnSymmWindowClose()
 {
-    if (hCryptThread && CONFIRM(_T("crypt thread running, exit?")) != IDOK)
+    if (hCryptThread && CONFIRM(_T("Crypt thread running, exit?")) != IDOK)
         return TRUE;
     return FALSE;
 }

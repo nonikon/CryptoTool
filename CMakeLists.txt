@@ -1,10 +1,16 @@
 cmake_minimum_required(VERSION 3.4)
+
+if(POLICY CMP0091)
+    cmake_policy(SET CMP0091 NEW) # Enable MSVC_RUNTIME_LIBRARY setting
+endif()
+
 project(CryptoTool LANGUAGES C)
 
 add_executable(CryptoTool WIN32
     mainWindow.c
     symmWindow.c
     digestWindow.c
+    ecdsaWindow.c
     randomWindow.c
     convertWindow.c
     common.c

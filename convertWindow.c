@@ -92,7 +92,7 @@ static void onConvertClicked(HWND hWnd)
         inl = MAX_INFILE_SIZE;
         _in = ReadFileOnce(in, (UINT*) &inl);
         if (!_in) {
-            WARN(_T("file [%s] does not exist or > %uKB"), TRIMPATH(in), MAX_INFILE_SIZE / 1024);
+            WARN(_T("File [%s] does not exist or > %uKB"), TRIMPATH(in), MAX_INFILE_SIZE / 1024);
             goto cleanup;
         }
         free(in);

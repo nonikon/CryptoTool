@@ -16,7 +16,6 @@ typedef struct stDigestThreadParams {
     /* IN */
     HWND hWnd;
     TCHAR* inPath;
-    TCHAR* outPath;
     CONST EVP_MD* md;
     BYTE* key;
     INT keyl;
@@ -183,11 +182,11 @@ static DWORD doDigestFile(VOID* arg)
     hIn = CreateFile(params->inPath, GENERIC_READ, FILE_SHARE_READ, NULL,
                     OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hIn == INVALID_HANDLE_VALUE) {
-        wsprintf(params->errorMsg, _T("open INPUT file [%s] failed"), TRIMPATH(params->inPath));
+        wsprintf(params->errorMsg, _T("Open INPUT file [%s] failed"), TRIMPATH(params->inPath));
         goto done;
     }
     if (!GetFileSizeEx(hIn, &params->inLen)) {
-        wsprintf(params->errorMsg, _T("get INPUT file size [%s] failed"), TRIMPATH(params->inPath));
+        wsprintf(params->errorMsg, _T("Get INPUT file size [%s] failed"), TRIMPATH(params->inPath));
         goto done;
     }
 
@@ -196,7 +195,7 @@ static DWORD doDigestFile(VOID* arg)
 
     while (1) {
         if (bDigestThreadCanceled) {
-            wsprintf(params->errorMsg, _T("digest thread canceled"));
+            wsprintf(params->errorMsg, _T("Digest thread canceled"));
             goto done;
         }
         ReadFile(hIn, rBuf, FILE_RBUF_SIZE, &nRead, NULL);
@@ -242,7 +241,7 @@ static void onDigestThreadDone(HWND hWnd, DigestThreadParams* params)
     CloseHandle(hDigestThread);
 
     if (params->outLen) {
-        FormatTextTo(hInputStaticText, _T("INPUT %ld"), params->inLen.QuadPart);
+        FormatTextTo(hInputStaticText, _T("INPUT %lld"), params->inLen.QuadPart);
         FormatTextTo(hOutputStaticText, _T("OUTPUT %d (%u.%us)"), params->outLen,
             params->time / 1000, params->time % 1000);
         showDigestResult(params->out, params->outLen, params->outfmt);
@@ -254,7 +253,6 @@ static void onDigestThreadDone(HWND hWnd, DigestThreadParams* params)
     SendMessage(hDigestProgressBar, PBM_SETPOS, 0, 0);
 
     free(params->inPath);
-    free(params->outPath);
     free(params->key);
     hDigestThread = NULL;
 }
@@ -276,7 +274,7 @@ static void onDigestClicked(HWND hWnd)
 
 #define __CONVERT_INPUT_NOTRIM(func, notify) \
         inl = func(in); \
-        if (inl <= 0) { \
+        if (inl < 0) { /* inl == 0 is allowed */ \
             WARN(notify); \
             goto cleanup; \
         }
@@ -290,7 +288,7 @@ static void onDigestClicked(HWND hWnd)
         if (TrimSpace(key)) \
             SetWindowText(hKeyEditBox, key); \
         keyl = func(key); \
-        if (keyl < 0) { \
+        if (keyl < 0) { /* keyl == 0 is allowed */  \
             WARN(notify); \
             goto cleanup; \
         }
@@ -303,10 +301,10 @@ static void onDigestClicked(HWND hWnd)
         case KVFMT_BASE64:
             __CONVERT_KEY(Base64CharsToBinary, _T("KEY is not a BASE64 string"))
             break;
-        case IFMT_C_ARRAY:
+        case KVFMT_C_ARRAY:
             __CONVERT_KEY(CArrayCharsToBinary, _T("KEY is not a C-ARRAY string"));
             break;
-        case IFMT_C_STRING:
+        case KVFMT_C_STRING:
             __CONVERT_KEY(CStringCharsToBinary, _T("KEY is not a C-STRING string"));
             break;
         default:
@@ -386,27 +384,20 @@ static void onDigestClicked(HWND hWnd)
     case IFMT_FILE:
         /* start digest file int the thread. */
         if (hDigestThread) {
-            WARN(_T("digest thread already running"));
+            WARN(_T("Digest thread already running"));
             goto cleanup;
         }
-        out = GetTextOnce(hOutputEditBox);
-
-        if (IsFile(out) && CONFIRM(_T("OUTPUT file will be overwrite, continue?")) != IDOK)
-            goto cleanup;
-
         digestThreadParams.hWnd = hWnd;
         digestThreadParams.inPath = in;
-        digestThreadParams.outPath = out;
         digestThreadParams.md = md;
         digestThreadParams.key = key;
-        if (key)
-            digestThreadParams.keyl = keyl;
+        digestThreadParams.keyl = keyl;
         digestThreadParams.outfmt = outfmt;
 
         bDigestThreadCanceled = FALSE;
         hDigestThread = CreateThread(NULL, 0, doDigestFile, &digestThreadParams, 0, NULL);
         if (!hDigestThread) {
-            WARN(_T("create digest thread failed"));
+            WARN(_T("Create digest thread failed"));
             goto cleanup;
         }
         ShowWindow(hDigestProgressBar, SW_SHOW);
@@ -523,7 +514,7 @@ static void onWindowCreate(HWND hWnd)
     hKeyformatComboBox = CreateWindow(_T("COMBOBOX"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | CBS_DROPDOWNLIST,
                                 0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
     hKeyStaticText = CreateWindow(_T("STATIC"), _T("KEY"), WS_CHILD | WS_VISIBLE | SS_LEFT,
-                                0, 0, 0, 0, hWnd, NULL, NULL, NULL);
+                                0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
     hKeyEditBox = CreateWindow(_T("EDIT"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | ES_AUTOVSCROLL | ES_MULTILINE,
                                 0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
 
@@ -681,7 +672,7 @@ VOID OnDigestConfigItem(CONST TCHAR* name, CONST TCHAR* value)
 
 BOOL OnDigestWindowClose()
 {
-    if (hDigestThread && CONFIRM(_T("digest thread running, exit?")) != IDOK)
+    if (hDigestThread && CONFIRM(_T("Digest thread running, exit?")) != IDOK)
         return TRUE;
     return FALSE;
 }
