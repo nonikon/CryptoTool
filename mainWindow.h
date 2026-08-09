@@ -28,21 +28,25 @@ extern HWND hMainWindow;
 
 HWND CreateSymmWindow(HWND hWnd);
 HWND CreateDigestWindow(HWND hWnd);
+HWND CreateEcdsaWindow(HWND hWnd);
 HWND CreateRandomWindow(HWND hWnd);
 HWND CreateConvertWindow(HWND hWnd);
 
 BOOL OnSymmWindowClose();
 BOOL OnDigestWindowClose();
+BOOL OnEcdsaWindowClose();
 BOOL OnRandomWindowClose();
 BOOL OnConvertWindowClose();
 
 VOID OnSymmConfigItem(CONST TCHAR* name, CONST TCHAR* value);
 VOID OnDigestConfigItem(CONST TCHAR* name, CONST TCHAR* value);
+VOID OnEcdsaConfigItem(CONST TCHAR* name, CONST TCHAR* value);
 VOID OnRandomConfigItem(CONST TCHAR* name, CONST TCHAR* value);
 VOID OnConvertConfigItem(CONST TCHAR* name, CONST TCHAR* value);
 
 VOID OnSymmConfigSave(FILE* fp);
 VOID OnDigestConfigSave(FILE* fp);
+VOID OnEcdsaConfigSave(FILE* fp);
 VOID OnRandomConfigSave(FILE* fp);
 VOID OnConvertConfigSave(FILE* fp);
 

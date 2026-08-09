@@ -12,13 +12,13 @@ static HFONT hTitleFont;
 static HWND hMainTab;
 
 static HWND hTabWnds[] = {
-    NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL,
 };
 static CONST TCHAR* tabItems[] = {
-    _T("SYMM"), _T("DIGEST"), _T("RANDOM"), _T("CONVERT"),
+    _T("SYMM"), _T("DIGEST"), _T("ECDSA"), _T("RANDOM"), _T("CONVERT"),
 };
 enum {
-    TAB_SYMM, TAB_DGST, TAB_RANDOM, TAB_CONVERT,
+    TAB_SYMM, TAB_DGST, TAB_ECDSA, TAB_RANDOM, TAB_CONVERT,
 };
 
 static void resizeWindows(HWND hWnd)
@@ -96,6 +96,8 @@ static void saveConfigs()
         OnSymmConfigSave(fp);
         _ftprintf(fp, "\r\n[%s]\r\n", tabItems[TAB_DGST]);
         OnDigestConfigSave(fp);
+        _ftprintf(fp, "\r\n[%s]\r\n", tabItems[TAB_ECDSA]);
+        OnEcdsaConfigSave(fp);
         _ftprintf(fp, "\r\n[%s]\r\n", tabItems[TAB_RANDOM]);
         OnRandomConfigSave(fp);
         _ftprintf(fp, "\r\n[%s]\r\n", tabItems[TAB_CONVERT]);
@@ -120,6 +122,8 @@ static int onConfigItem(void* user, const char* section,
         OnSymmConfigItem(name, value);
     } else if (!lstrcmp(section, tabItems[TAB_DGST])) {
         OnDigestConfigItem(name, value);
+    } else if (!lstrcmp(section, tabItems[TAB_ECDSA])) {
+        OnEcdsaConfigItem(name, value);
     } else if (!lstrcmp(section, tabItems[TAB_RANDOM])) {
         OnRandomConfigItem(name, value);
     } else if (!lstrcmp(section, tabItems[TAB_CONVERT])) {
@@ -145,6 +149,10 @@ static void onWindowCreate(HWND hWnd)
     hTabWnds[TAB_DGST] = CreateDigestWindow(hMainTab);
     tci.pszText = (PSTR) tabItems[TAB_DGST];
     SendMessage(hMainTab, TCM_INSERTITEM, (WPARAM) TAB_DGST, (LPARAM) &tci);
+
+    hTabWnds[TAB_ECDSA] = CreateEcdsaWindow(hMainTab);
+    tci.pszText = (PSTR) tabItems[TAB_ECDSA];
+    SendMessage(hMainTab, TCM_INSERTITEM, (WPARAM) TAB_ECDSA, (LPARAM) &tci);
 
     hTabWnds[TAB_RANDOM] = CreateRandomWindow(hMainTab);
     tci.pszText = (PSTR) tabItems[TAB_RANDOM];
@@ -190,6 +198,7 @@ static void onWindowClose(HWND hWnd)
 {
     if (!OnSymmWindowClose()
             && !OnDigestWindowClose()
+            && !OnEcdsaWindowClose()
             && !OnRandomWindowClose()
             && !OnConvertWindowClose()) {
         saveConfigs();
