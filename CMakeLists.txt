@@ -20,8 +20,12 @@ add_executable(CryptoTool WIN32
 )
 
 target_compile_definitions(CryptoTool PRIVATE
+    INI_ALLOW_INLINE_COMMENTS=0
     INI_ALLOW_MULTILINE=0
-    INI_MAX_LINE=4096)
+    INI_ALLOW_REALLOC=1
+    INI_USE_STACK=0
+    INI_MAX_LINE=131072
+)
 
 target_sources(CryptoTool PRIVATE resource/CryptoTool.rc)
 
