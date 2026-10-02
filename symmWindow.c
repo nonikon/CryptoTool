@@ -279,8 +279,8 @@ static void onCryptThreadDone(HWND hWnd, CryptThreadParams* params)
     CloseHandle(hCryptThread);
 
     if (params->isSucc) {
-        FormatTextTo(hInputStaticText, _T("INPUT %lld"), params->inLen.QuadPart);
-        FormatTextTo(hOutputStaticText, _T("OUTPUT %lld (%u.%us)"), params->outLen.QuadPart,
+        FormatTextTo(hInputStaticText, _T("INPUT %I64d"), params->inLen.QuadPart);
+        FormatTextTo(hOutputStaticText, _T("OUTPUT %I64d (%u.%us)"), params->outLen.QuadPart,
             params->time / 1000, params->time % 1000);
     } else {
         WARN(params->errorMsg);

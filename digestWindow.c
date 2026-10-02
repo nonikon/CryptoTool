@@ -241,7 +241,7 @@ static void onDigestThreadDone(HWND hWnd, DigestThreadParams* params)
     CloseHandle(hDigestThread);
 
     if (params->outLen) {
-        FormatTextTo(hInputStaticText, _T("INPUT %lld"), params->inLen.QuadPart);
+        FormatTextTo(hInputStaticText, _T("INPUT %I64d"), params->inLen.QuadPart);
         FormatTextTo(hOutputStaticText, _T("OUTPUT %d (%u.%us)"), params->outLen,
             params->time / 1000, params->time % 1000);
         showDigestResult(params->out, params->outLen, params->outfmt);
@@ -268,7 +268,7 @@ static void onDigestClicked(HWND hWnd)
     VOID* key = GETBTCHCK(hHMacCheckBox) ? GetTextOnce(hKeyEditBox) : NULL;
     VOID* in = GetTextOnce(hInputEditBox);
     VOID* out = NULL;
-    INT keyl;
+    INT keyl = 0;
     INT inl;
     INT outl;
 
