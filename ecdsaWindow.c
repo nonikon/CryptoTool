@@ -26,8 +26,8 @@ static HWND hPubKeyformatStaticText;
 static HWND hPubKeyformatComboBox;
 static HWND hPubKeyStaticText;
 static HWND hPubKeyEditBox;
-static HWND hTbsDataStaticText;
-static HWND hTbsDataEditBox;
+static HWND hHashStaticText;
+static HWND hHashEditBox;
 static HWND hSignatureStaticText;
 static HWND hSignatureEditBox;
 static HWND hSignButton;
@@ -39,7 +39,7 @@ static CONST TCHAR* curveItems[] = {
 enum {
     CURVE_SCEP224R1, CURVE_SCEP256R1, CURVE_SCEP384R1, CURVE_SCEP521R1,
 };
-static CONST TCHAR* tbsformatItems[] = {
+static CONST TCHAR* hashformatItems[] = {
     _T("BASE64"), _T("C-ARRAY"), _T("C-STRING"), _T("HEX"),
 };
 enum {
@@ -189,31 +189,31 @@ static void doEcdsa(HWND hWnd, BOOL isVerify)
     EC_KEY* eck = NULL;
     ECDSA_SIG* sig = NULL;
     INT curve = GETCBOPT(hCurveComboBox);
-    INT tbsfmt = GETCBOPT(hInformatComboBox);
+    INT hashfmt = GETCBOPT(hInformatComboBox);
     INT sigfmt = GETCBOPT(hOutformatComboBox);
     INT prikfmt = GETCBOPT(hPriKeyformatComboBox);
     INT pubkfmt = GETCBOPT(hPubKeyformatComboBox);
     VOID* prik = GetTextOnce(hPriKeyEditBox);
     VOID* pubk = GetTextOnce(hPubKeyEditBox);
-    VOID* tbs = GetTextOnce(hTbsDataEditBox);
+    VOID* hash = GetTextOnce(hHashEditBox);
     TCHAR* sigs = NULL;
     INT prikl;
     INT pubkl;
     INT bsz;
-    INT tbsl;
+    INT hashl;
     INT sigl;
 
-#define __CONVERT_TBSDATA_NOTRIM(func, notify) \
-        tbsl = func(tbs); \
-        if (tbsl <= 0) { \
+#define __CONVERT_HASH_NOTRIM(func, notify) \
+        hashl = func(hash); \
+        if (hashl <= 0) { \
             WARN(notify); \
             goto cleanup; \
         }
 
-#define __CONVERT_TBSDATA(func, notify) \
-        if (TrimSpace(tbs)) \
-            SetWindowText(hTbsDataEditBox, tbs); \
-        __CONVERT_TBSDATA_NOTRIM(func, notify)
+#define __CONVERT_HASH(func, notify) \
+        if (TrimSpace(hash)) \
+            SetWindowText(hHashEditBox, hash); \
+        __CONVERT_HASH_NOTRIM(func, notify)
 
 #define __CONVERT_PRIK(func, notify) \
         if (TrimSpace(prik)) \
@@ -384,24 +384,24 @@ static void doEcdsa(HWND hWnd, BOOL isVerify)
         free(ks);
     }
 
-    switch (tbsfmt) {
+    switch (hashfmt) {
     case IFMT_HEX:
-        __CONVERT_TBSDATA(HexCharsToBinary, _T("TBSDATA is not a HEX string"));
+        __CONVERT_HASH(HexCharsToBinary, _T("HASH is not a HEX string"));
         break;
     case IFMT_BASE64:
-        __CONVERT_TBSDATA(Base64CharsToBinary, _T("TBSDATA is not a BASE64 string"));
+        __CONVERT_HASH(Base64CharsToBinary, _T("HASH is not a BASE64 string"));
         break;
     case IFMT_C_ARRAY:
-        __CONVERT_TBSDATA(CArrayCharsToBinary, _T("TBSDATA is not a C-ARRAY string"));
+        __CONVERT_HASH(CArrayCharsToBinary, _T("HASH is not a C-ARRAY string"));
         break;
     case IFMT_C_STRING:
-        __CONVERT_TBSDATA(CStringCharsToBinary, _T("TBSDATA is not a C-STRING string"));
+        __CONVERT_HASH(CStringCharsToBinary, _T("HASH is not a C-STRING string"));
         break;
     default:
-        WARN(_T("Invalid TBS-FORMAT"));
+        WARN(_T("Invalid HASH-FORMAT"));
         goto cleanup;
     }
-    FormatTextTo(hTbsDataStaticText, _T("TBSDATA %d"), tbsl);
+    FormatTextTo(hHashStaticText, _T("HASH %d"), hashl);
 
     if (isVerify) {
         sigs = GetTextOnce(hSignatureEditBox);
@@ -439,7 +439,7 @@ static void doEcdsa(HWND hWnd, BOOL isVerify)
                 bsz * 2, bsz * 2, bsz * 2 + 8);
             goto cleanup;
         }
-        if (!ECDSA_do_verify(tbs, tbsl, sig, eck) == 1) {
+        if (!ECDSA_do_verify(hash, hashl, sig, eck) == 1) {
             WARN("Verify failed, code 0x%08X", ERR_get_error());
             goto cleanup;
         }
@@ -449,7 +449,7 @@ static void doEcdsa(HWND hWnd, BOOL isVerify)
             WARN("PRIVATE-KEY is needed for signing");
             goto cleanup;
         }
-        sig = ECDSA_do_sign(tbs, tbsl, eck);
+        sig = ECDSA_do_sign(hash, hashl, eck);
         if (!sig) {
             WARN("Sign failed, code 0x%08X", ERR_get_error());
             goto cleanup;
@@ -485,15 +485,15 @@ static void doEcdsa(HWND hWnd, BOOL isVerify)
 cleanup:
     free(prik);
     free(pubk);
-    free(tbs);
+    free(hash);
     free(sigs);
     ECDSA_SIG_free(sig);
     EC_KEY_free(eck);
 #undef __CONVERT_SIG
 #undef __CONVERT_PUBK
 #undef __CONVERT_PRIK
-#undef __CONVERT_TBSDATA
-#undef __CONVERT_TBSDATA_NOTRIM
+#undef __CONVERT_HASH
+#undef __CONVERT_HASH_NOTRIM
 }
 
 static void onSignClicked(HWND hWnd)
@@ -544,9 +544,9 @@ static void resizeWindows(HWND hWnd)
     MoveWindow(hPubKeyEditBox, iAlign, h, w - iAlign * 2, iLineH * 4, FALSE);
     h += iLineH * 4 + iAlign;
 
-    MoveWindow(hTbsDataStaticText, iAlign, h, w - iAlign * 2, iLineH, FALSE);
+    MoveWindow(hHashStaticText, iAlign, h, w - iAlign * 2, iLineH, FALSE);
     h += iLineH;
-    MoveWindow(hTbsDataEditBox, iAlign, h, w - iAlign * 2, iLineH * 3, FALSE);
+    MoveWindow(hHashEditBox, iAlign, h, w - iAlign * 2, iLineH * 3, FALSE);
     h += iLineH * 3 + iAlign;
 
     MoveWindow(hSignatureStaticText, iAlign, h, w - iAlign * 2, iLineH, FALSE);
@@ -569,7 +569,7 @@ static void onWindowCreate(HWND hWnd)
                                 0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
     hCurveComboBox = CreateWindow(_T("COMBOBOX"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | CBS_DROPDOWNLIST,
                                 0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
-    hInformatStaticText = CreateWindow(_T("STATIC"), _T("TBS-FORMAT"), WS_CHILD | WS_VISIBLE | SS_LEFT,
+    hInformatStaticText = CreateWindow(_T("STATIC"), _T("HASH-FORMAT"), WS_CHILD | WS_VISIBLE | SS_LEFT,
                                 0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
     hInformatComboBox = CreateWindow(_T("COMBOBOX"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | CBS_DROPDOWNLIST,
                                 0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
@@ -596,9 +596,9 @@ static void onWindowCreate(HWND hWnd)
     hPubKeyEditBox = CreateWindow(_T("EDIT"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | ES_LEFT | ES_AUTOVSCROLL | ES_MULTILINE,
                                 0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
 
-    hTbsDataStaticText = CreateWindow(_T("STATIC"), _T("TBSDATA"), WS_CHILD | WS_VISIBLE | SS_LEFT,
+    hHashStaticText = CreateWindow(_T("STATIC"), _T("HASH"), WS_CHILD | WS_VISIBLE | SS_LEFT,
                                 0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
-    hTbsDataEditBox = CreateWindow(_T("EDIT"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | ES_LEFT | ES_AUTOVSCROLL | ES_MULTILINE,
+    hHashEditBox = CreateWindow(_T("EDIT"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | ES_LEFT | ES_AUTOVSCROLL | ES_MULTILINE,
                                 0, 0, 0, 0, hWnd, NULL, hMainInstance, NULL);
 
     hSignatureStaticText = CreateWindow(_T("STATIC"), _T("SIGNATURE"), WS_CHILD | WS_VISIBLE | SS_LEFT,
@@ -614,8 +614,8 @@ static void onWindowCreate(HWND hWnd)
     for (i = 0; i < ARRAYSIZE(curveItems); ++i)
         SendMessage(hCurveComboBox, CB_ADDSTRING, 0, (LPARAM) curveItems[i]);
 	SETCBOPT(hCurveComboBox, CURVE_SCEP256R1);
-    for (i = 0; i < ARRAYSIZE(tbsformatItems); ++i)
-        SendMessage(hInformatComboBox, CB_ADDSTRING, 0, (LPARAM) tbsformatItems[i]);
+    for (i = 0; i < ARRAYSIZE(hashformatItems); ++i)
+        SendMessage(hInformatComboBox, CB_ADDSTRING, 0, (LPARAM) hashformatItems[i]);
 	SETCBOPT(hInformatComboBox, IFMT_HEX);
     for (i = 0; i < ARRAYSIZE(sigformatItems); ++i)
         SendMessage(hOutformatComboBox, CB_ADDSTRING, 0, (LPARAM) sigformatItems[i]);
@@ -627,7 +627,7 @@ static void onWindowCreate(HWND hWnd)
 	SETCBOPT(hPriKeyformatComboBox, KEYFMT_HEX);
 	SETCBOPT(hPubKeyformatComboBox, KEYFMT_HEX);
 
-    SendMessage(hTbsDataEditBox, EM_SETLIMITTEXT, (WPARAM) (MAX_INFILE_SIZE * 5), 0);
+    SendMessage(hHashEditBox, EM_SETLIMITTEXT, (WPARAM) (MAX_INFILE_SIZE * 5), 0);
     SendMessage(hSignatureEditBox, EM_SETLIMITTEXT, (WPARAM) (MAX_INFILE_SIZE * 5), 0);
 
     resizeWindows(hWnd);
@@ -675,25 +675,25 @@ VOID OnEcdsaConfigSave(FILE* fp)
 {
     TCHAR* prik = GetTextOnce(hPriKeyEditBox);
     TCHAR* pubk = GetTextOnce(hPubKeyEditBox);
-    TCHAR* tbsdata = GetTextOnce(hTbsDataEditBox);
+    TCHAR* hashdata = GetTextOnce(hHashEditBox);
     TCHAR* signature = GetTextOnce(hSignatureEditBox);
 
     TrimSpace(prik);
     TrimSpace(pubk);
-    TrimSpace(tbsdata);
+    TrimSpace(hashdata);
     TrimSpace(signature);
 
-    _ftprintf(fp, _T("CURVE=%s\r\nTBS-FORMAT=%s\r\nSIG-FORMAT=%s\r\n")
-        _T("PRIK-FORMAT=%s\r\nPUBK-FORMAT=%s\r\nPRIVATE-KEY=%s\r\nPUBLIC-KEY=%s\r\nTBSDATA=%s\r\nSIGNATURE=%s\r\n"),
+    _ftprintf(fp, _T("CURVE=%s\r\nHASH-FORMAT=%s\r\nSIG-FORMAT=%s\r\n")
+        _T("PRIK-FORMAT=%s\r\nPUBK-FORMAT=%s\r\nPRIVATE-KEY=%s\r\nPUBLIC-KEY=%s\r\nHASH=%s\r\nSIGNATURE=%s\r\n"),
         curveItems[GETCBOPT(hCurveComboBox)],
-        tbsformatItems[GETCBOPT(hInformatComboBox)],
+        hashformatItems[GETCBOPT(hInformatComboBox)],
         sigformatItems[GETCBOPT(hOutformatComboBox)],
         keyformatItems[GETCBOPT(hPriKeyformatComboBox)],
-        keyformatItems[GETCBOPT(hPubKeyformatComboBox)], prik, pubk, tbsdata, signature);
+        keyformatItems[GETCBOPT(hPubKeyformatComboBox)], prik, pubk, hashdata, signature);
 
     free(prik);
     free(pubk);
-    free(tbsdata);
+    free(hashdata);
     free(signature);
 }
 
@@ -712,8 +712,8 @@ VOID OnEcdsaConfigItem(CONST TCHAR* name, CONST TCHAR* value)
 
     if (!lstrcmp(name, _T("CURVE"))) {
         __SELECT_OPTION(curveItems, hCurveComboBox);
-    } else if (!lstrcmp(name, _T("TBS-FORMAT"))) {
-        __SELECT_OPTION(tbsformatItems, hInformatComboBox);
+    } else if (!lstrcmp(name, _T("HASH-FORMAT"))) {
+        __SELECT_OPTION(hashformatItems, hInformatComboBox);
     } else if (!lstrcmp(name, _T("SIG-FORMAT"))) {
         __SELECT_OPTION(sigformatItems, hOutformatComboBox);
     } else if (!lstrcmp(name, _T("PRIK-FORMAT"))) {
@@ -724,8 +724,8 @@ VOID OnEcdsaConfigItem(CONST TCHAR* name, CONST TCHAR* value)
         SetWindowText(hPriKeyEditBox, value);
     } else if (!lstrcmp(name, _T("PUBLIC-KEY"))) {
         SetWindowText(hPubKeyEditBox, value);
-    } else if (!lstrcmp(name, _T("TBSDATA"))) {
-        SetWindowText(hTbsDataEditBox, value);
+    } else if (!lstrcmp(name, _T("HASH"))) {
+        SetWindowText(hHashEditBox, value);
     } else if (!lstrcmp(name, _T("SIGNATURE"))) {
         SetWindowText(hSignatureEditBox, value);
     }
