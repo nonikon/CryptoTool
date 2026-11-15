@@ -18,7 +18,8 @@ typedef struct stCryptThreadParams {
     EVP_CIPHER_CTX* ciphCtx;
     TCHAR* inPath;
     TCHAR* outPath;
-    BOOL needChkSize;
+    INT inLenMin;
+    INT inLenBlk;
     /* OUT */
     BOOL isSucc;
     TCHAR errorMsg[256];
@@ -58,11 +59,13 @@ static HWND hDecryptButton;
 static HWND hCryptProgressBar;
 
 static CONST TCHAR* algorithmItems[] = {
-    _T("AES"), _T("ARIA"), _T("BLOWFISH"), _T("CAMELLIA"), _T("CAST5"), _T("CHACHA20"), _T("DES"), _T("DESEDE3"),
+    _T("AES"), _T("AESWRAP"), _T("AESWRAPPAD"), _T("ARIA"), _T("BLOWFISH"), _T("CAMELLIA"),
+    _T("CAST5"), _T("CHACHA20"), _T("DES"), _T("DESEDE3"),
     _T("IDEA"), _T("RC2"), _T("RC4"), _T("RC5"), _T("SEED"), _T("SM4"),
 };
 enum {
-    ALG_AES, ALG_ARIA, ALG_BLOWFISH, ALG_CAMELLIA, ALG_CAST5, ALG_CHACHA20, ALG_DES, ALG_DESEDE3,
+    ALG_AES, ALG_AESWRAP, ALG_AESWRAPPAD, ALG_ARIA, ALG_BLOWFISH, ALG_CAMELLIA,
+    ALG_CAST5, ALG_CHACHA20, ALG_DES, ALG_DESEDE3,
     ALG_IDEA, ALG_RC2, ALG_RC4, ALG_RC5, ALG_SEED, ALG_SM4,
 };
 static CONST TCHAR* modeItems[] = {
@@ -123,6 +126,8 @@ static void onDropFiles(HWND hWnd, HDROP hDrop)
 static BOOL isModeNeeded(INT alg)
 {
     switch (alg) {
+    case ALG_AESWRAP:
+    case ALG_AESWRAPPAD:
     case ALG_CHACHA20:
     case ALG_RC4:
         return FALSE;
@@ -133,6 +138,8 @@ static BOOL isModeNeeded(INT alg)
 static BOOL isPaddingNeeded(INT alg, INT mode)
 {
     switch (alg) {
+    case ALG_AESWRAP:
+    case ALG_AESWRAPPAD:
     case ALG_CHACHA20:
     case ALG_RC4:
         return FALSE;
@@ -152,6 +159,8 @@ static BOOL isIVNeeded(INT alg, INT mode)
     switch (alg) {
     case ALG_CHACHA20:
         return TRUE;
+    case ALG_AESWRAP:
+    case ALG_AESWRAPPAD:
     case ALG_RC4:
         return FALSE;
     default:
@@ -207,9 +216,12 @@ static DWORD doCryptFile(VOID* arg)
         wsprintf(params->errorMsg, _T("Get INPUT file size [%s] failed"), TRIMPATH(params->inPath));
         goto done;
     }
-    if (params->needChkSize && params->inLen.QuadPart % EVP_CIPHER_CTX_block_size(params->ciphCtx) != 0) {
-        wsprintf(params->errorMsg, _T("INPUT file size is not a multiple of %d"),
-            EVP_CIPHER_CTX_block_size(params->ciphCtx));
+    if (params->inLen.QuadPart < params->inLenMin || params->inLen.QuadPart % params->inLenBlk != 0) {
+        if (params->inLenBlk > 1)
+            wsprintf(params->errorMsg, _T("INPUT file size should >= %d and a multiple of %d"),
+                params->inLenMin, params->inLenBlk);
+        else
+            wsprintf(params->errorMsg, _T("INPUT file size should >= %d"), params->inLenMin);
         goto done;
     }
 
@@ -311,6 +323,8 @@ static void doCrypt(HWND hWnd, BOOL isDec)
     VOID* in = GetTextOnce(hInputEditBox);
     VOID* out = NULL;
     TCHAR* outs = NULL;
+    INT inlmin; /* minimal input length */
+    INT inlblk; /* input block size */
     INT keyl;
     INT ivl;
     INT inl;
@@ -319,7 +333,7 @@ static void doCrypt(HWND hWnd, BOOL isDec)
 
 #define __SELECT_CIPHER_BY_MODE(name) \
         switch (mode) { \
-        case MODE_ECB: ciph = EVP_##name##_ecb(); ivl = 0; /* ignore input IV */ break; \
+        case MODE_ECB: ciph = EVP_##name##_ecb(); ivl = -1; /* ignore input IV */ break; \
         case MODE_CBC: ciph = EVP_##name##_cbc(); break; \
         case MODE_CFB: ciph = EVP_##name##_cfb(); break; \
         case MODE_OFB: ciph = EVP_##name##_ofb(); break; \
@@ -331,7 +345,7 @@ static void doCrypt(HWND hWnd, BOOL isDec)
 
 #define __SELECT_CIPHER_BY_MODE_NOCTR(name, notify) \
         switch (mode) { \
-        case MODE_ECB: ciph = EVP_##name##_ecb(); ivl = 0; /* ignore input IV */ break; \
+        case MODE_ECB: ciph = EVP_##name##_ecb(); ivl = -1; /* ignore input IV */ break; \
         case MODE_CBC: ciph = EVP_##name##_cbc(); break; \
         case MODE_CFB: ciph = EVP_##name##_cfb(); break; \
         case MODE_OFB: ciph = EVP_##name##_ofb(); break; \
@@ -354,6 +368,16 @@ static void doCrypt(HWND hWnd, BOOL isDec)
         case 256 / 8: \
             __SELECT_CIPHER_BY_MODE(name##_256) \
             break; \
+        default: \
+            WARN(_T("KEY length should be 128/192/256 bits")); \
+            goto cleanup; \
+        }
+
+#define __SELECT_CIPHER_BY_KEYL_NOMODE(name, suffix) \
+        switch (keyl) { \
+        case 128 / 8: ciph = EVP_##name##_128_##suffix##(); break; \
+        case 192 / 8: ciph = EVP_##name##_192_##suffix##(); break; \
+        case 256 / 8: ciph = EVP_##name##_256_##suffix##(); break; \
         default: \
             WARN(_T("KEY length should be 128/192/256 bits")); \
             goto cleanup; \
@@ -429,6 +453,16 @@ static void doCrypt(HWND hWnd, BOOL isDec)
     case ALG_AES:
         __SELECT_CIPHER_BY_KEYL(aes)
         break;
+    case ALG_AESWRAP:
+        __SELECT_CIPHER_BY_KEYL_NOMODE(aes, wrap);
+        EVP_CIPHER_CTX_set_flags(ctx, EVP_CIPHER_CTX_FLAG_WRAP_ALLOW);
+        ivl = -1; /* ignore input IV, fixed with A6A6A6A6A6A6A6A6 */
+        break;
+    case ALG_AESWRAPPAD:
+        __SELECT_CIPHER_BY_KEYL_NOMODE(aes, wrap_pad);
+        EVP_CIPHER_CTX_set_flags(ctx, EVP_CIPHER_CTX_FLAG_WRAP_ALLOW);
+        ivl = -1; /* ignore input IV */
+        break;
     case ALG_ARIA:
         __SELECT_CIPHER_BY_KEYL(aria)
         break;
@@ -464,7 +498,7 @@ static void doCrypt(HWND hWnd, BOOL isDec)
             WARN(_T("RC4 KEY length only supports 40/128 bits"));
             goto cleanup;
         }
-        ivl = 0; /* ignore input IV */
+        ivl = -1; /* ignore input IV */
         break;
     case ALG_RC5: // rc5_32_12_16: 32 bits word size, 12 rounds, 16 bytes key length. And 64 bits block size
         __SELECT_CIPHER_BY_MODE_NOCTR(rc5_32_12_16, RC5);
@@ -484,13 +518,13 @@ static void doCrypt(HWND hWnd, BOOL isDec)
         WARN(_T("KEY length should be %d bits"), EVP_CIPHER_key_length(ciph) * 8);
         goto cleanup;
     }
-    if (ivl != EVP_CIPHER_iv_length(ciph)) {
+    if (ivl != -1 && ivl != EVP_CIPHER_iv_length(ciph)) {
         WARN(_T("IV length should be %d bits"), EVP_CIPHER_iv_length(ciph) * 8);
         goto cleanup;
     }
 
-    if (!EVP_CipherInit(ctx, ciph, key, ivl > 0 ? iv : NULL, !isDec)) {
-        WARN(_T("EVP_CipherInit failed"));
+    if (!EVP_CipherInit_ex(ctx, ciph, NULL, key, ivl > 0 ? iv : NULL, !isDec)) {
+        WARN(_T("EVP_CipherInit failed, code 0x%08X"), ERR_get_error());
         goto cleanup;
     }
 
@@ -504,6 +538,20 @@ static void doCrypt(HWND hWnd, BOOL isDec)
     default:
         WARN(_T("Invalid PADDING"));
         goto cleanup;
+    }
+
+    if (isPaddingNeeded(alg, mode)) {
+        inlblk = (isDec || pad == PAD_NONE) ? EVP_CIPHER_block_size(ciph) : 1;
+        inlmin = inlblk;
+    } else if (alg == ALG_AESWRAP) {
+        inlblk = 8;
+        inlmin = isDec ? 24 : 16;
+    } else if (alg == ALG_AESWRAPPAD && isDec) {
+        inlblk = 8;
+        inlmin = 16;
+    } else {
+        inlblk = 1;
+        inlmin = 1;
     }
 
     switch (infmt) {
@@ -550,13 +598,8 @@ static void doCrypt(HWND hWnd, BOOL isDec)
         cryptThreadParams.ciphCtx = ctx;
         cryptThreadParams.inPath = in;
         cryptThreadParams.outPath = outs;
-        if (isDec) {
-            /* input file size needs to be a multiple of block size when MODE is ECB/CBC. */
-            cryptThreadParams.needChkSize = isPaddingNeeded(alg, mode);
-        } else {
-            /* input file size needs to be a multiple of block size when MODE is ECB/CBC and padding is OFF. */
-            cryptThreadParams.needChkSize = isPaddingNeeded(alg, mode) && pad == PAD_NONE;
-        }
+        cryptThreadParams.inLenMin = inlmin;
+        cryptThreadParams.inLenBlk = inlblk;
         bCryptThreadCanceled = FALSE;
         hCryptThread = CreateThread(NULL, 0, doCryptFile, &cryptThreadParams, 0, NULL);
         if (!hCryptThread) {
@@ -574,14 +617,15 @@ static void doCrypt(HWND hWnd, BOOL isDec)
     }
     FormatTextTo(hInputStaticText, _T("INPUT %d"), inl);
 
-    if (isPaddingNeeded(alg, mode) && pad == PAD_NONE
-            && inl % EVP_CIPHER_block_size(ciph) != 0) {
-        WARN(_T("INPUT length needs to be a multiple of %d when PADDING is NONE"),
-            EVP_CIPHER_block_size(ciph));
+    if (inl < inlmin || inl % inlblk != 0) {
+        if (inlblk > 1)
+            WARN(_T("INPUT length should >= %d and a multiple of %d"), inlmin, inlblk);
+        else
+            WARN(_T("INPUT length should >= %d"), inlmin);
         goto cleanup;
     }
 
-    out = malloc(inl + EVP_CIPHER_block_size(ciph));
+    out = malloc(inl + EVP_MAX_BLOCK_LENGTH);
 
     if (!EVP_CipherUpdate(ctx, out, &outl, in, inl)) {
         WARN(_T("EVP_CipherUpdate failed, code 0x%08X"), ERR_get_error());
@@ -640,6 +684,7 @@ cleanup:
 #undef __CONVERT_KEY
 #undef __CONVERT_INPUT
 #undef __CONVERT_INPUT_NOTRIM
+#undef __SELECT_CIPHER_BY_KEYL_NOMODE
 #undef __SELECT_CIPHER_BY_KEYL
 #undef __SELECT_CIPHER_BY_MODE_NOCTR
 #undef __SELECT_CIPHER_BY_MODE
