@@ -9,7 +9,7 @@
 #include "common.h"
 #include "resource.h"
 
-#define VERSION_STRING      _T("V2.2-DEV")
+#define VERSION_STRING      _T("V2.2")
 
 #define CONFIG_FILENAME     _T("CryptoTool.ini")
 #define MAX_INFILE_SIZE     (128 * 1024)
