@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.10)
 
 if(POLICY CMP0091)
     cmake_policy(SET CMP0091 NEW) # Enable MSVC_RUNTIME_LIBRARY setting
@@ -32,4 +32,4 @@ target_sources(CryptoTool PRIVATE resource/CryptoTool.rc)
 target_link_libraries(CryptoTool libcrypto ComCtl32)
 
 target_include_directories(CryptoTool PRIVATE openssl/include)
-target_link_directories(CryptoTool PRIVATE openssl/lib)
+target_link_directories(CryptoTool PRIVATE openssl)
